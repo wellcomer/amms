@@ -1,0 +1,86 @@
+#!/usr/bin/perl
+
+use strict;
+
+use DBI;
+use Config::General;
+use Getopt::Long;
+
+my %config;
+my ($profile, $config_file);
+
+sub load_config {
+    
+    $config_file ||= '/etc/ammsd.conf';
+
+    %config = ();    
+    %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
+    
+    my $keys_count = scalar keys (%config);
+    
+    unless ($keys_count){
+	    die "Bad configuration in $config_file";
+    }
+
+    return $keys_count;
+}
+
+GetOptions ("profile|p=s" => \$profile, "config|c=s" => \$config_file);
+load_config ();
+
+my $dbh = DBI->connect ($config {$profile}{db}{dsn}, $config {$profile}{db}{user}, $config{$profile}{db}{pass},
+                       {RaiseError => 1, PrintError => 1, AutoCommit => 1});
+
+my ($ident, $date, $detail) = @ARGV;
+my @val;
+
+if ($date =~ /to*d*a*y*/i){
+
+    my @tm = localtime (time);
+    $date = sprintf ("%04d-%02d-%02d", $tm[5]+1900, $tm[4]+1, $tm[3]);
+}
+
+if ($detail){
+
+    my $rec = $dbh->selectall_arrayref ("select url,size from tlog where ident=? 
+                                         and ts REGEXP ? 
+                                         and (method='GET' or method='CONNECT') 
+                                         and hit=0 order by size desc", undef, $ident, $date);
+    for (@$rec){
+        @val = @{$_};
+        $val [1] = kmg ($val [1]);
+        printf ("%6s %s\n", $val [1], $val [0]);
+    }
+}
+else {
+
+    @val = $dbh->selectrow_array ("select sum(size) from tlog where ident=? and ts REGEXP ? and (method='GET' or method='CONNECT') and hit=0",
+                                     undef,  $ident, $date);
+    my $size = kmg ($val [0]);
+    print $size;
+}
+
+sub kmg { # human readable values
+    
+    my $bytes = shift;
+    my $value = $bytes;
+	    
+    my $g = 1073741824;
+    my $m = 1048576;
+    my $k = 1024;
+		        
+    if ($bytes >= $g){
+        $value = sprintf ('%.2f%s', $bytes / $g, 'G');
+    }
+    elsif ($bytes >= $m){
+	    $value = sprintf ('%.1f%s', $bytes / $m, 'M');
+    }
+    elsif ($bytes >= $k){
+        $value = sprintf ('%.1f%s', $bytes / $k, 'K');
+    }
+    
+    $value =~ s/\.0+\s/ /g;
+    
+    return $value;
+}
+

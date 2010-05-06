@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+
+use strict;
+use lib "/usr/lib/amms";
+use AMMS::Client;
+use Getopt::Long;
+
+my $uri;
+
+GetOptions ("uri|u=s" => \$uri);
+
+my $ammsc = AMMS::Client->new;
+   $ammsc->connect ($uri) || die "Can't connect to ammsd URI: $uri";
+
+my $profile = $ARGV [0] || die "ERR Undefined profile";
+
+my $list = $ammsc->exe ("ls_extension", $profile);
+   $list =~ s/\s/\n/g;
+
+print $list;

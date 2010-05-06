@@ -1,0 +1,250 @@
+#!/usr/bin/perl
+# AMMS console client (C) 2009
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+	    
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+			    
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# ammsc command line format
+# ammsc -p <profile> -c "<action> <ident> [params]"
+
+use strict;
+no  strict 'refs';
+use Getopt::Long;
+use POSIX qw(strftime);
+use AMMS::Client;
+use Carp;
+
+my $VERSION = 0.1;
+
+my %menu;
+my (%type, %stat);
+
+$menu {action} = [qw(limit reset)];
+$menu {type} = [qw(temp ident parent)];
+$menu {stat} = [qw(off on disabled)];
+
+%type = (temp => "T", ident => "I", parent => "P");
+%stat = (off => 0, on => 1, disabled => 2);
+
+my ($uri, $profile, $command);
+
+GetOptions ("uri|u=s" => \$uri, "profile|p=s" => \$profile, "exec|e=s" => \$command);
+
+if ($uri eq "" or $command eq ""){
+    print "Usage: ammsc --uri|-u uri [--profile|-p profile] --exec|-e command\n";
+    exit;
+}
+
+$profile ||= "default";
+
+my ($action, $ident, @argv) = split (/\s+/, $command);
+
+my $ammsc = AMMS::Client->new;
+   $ammsc->connect ($uri) || croak "Can't connect to ammsd URI: $uri";
+
+my @ext_list = split_res ($ammsc->exe ("ls_extension", $profile));
+push @{$menu {action}}, @ext_list;
+
+$action = cword ($menu {action}, $action);
+$action || croak "Undefined action";
+
+if (exists (&$action)){ # run internal
+    &$action ($ident, @argv);
+}
+else { # run extension
+    my @ext_res = exe ("run_extension", $action, $ident, @argv);
+
+    unless (defined $ext_res [0]){
+        err ();
+    }
+    else {
+        print join ("\n", @ext_res);
+        print "\n";
+    }
+}
+
+sub cword {
+
+    my ($word_list, $word_part) = @_;
+
+    unless ($word_list && $word_part){
+        return undef;
+    }
+    my $word;
+
+    for my $wrd (@$word_list){
+        if ($wrd =~ /^$word_part/){
+            return undef if ($word);
+            $word = $wrd;
+        }
+    }
+    return $word;
+}
+
+sub split_res {
+    return unless ($_[0]);
+    split (/\s/, shift);
+}
+
+sub ftime {
+    strftime "%a %b %e %H:%M:%S %Y", localtime shift;
+}
+
+sub ok {
+    print "OK " . $_[0] . "\n";
+}
+
+sub err {
+    my $err = shift || $ammsc->{err_desc};
+    print "ERR $err\n";
+}
+
+sub limit {
+
+#   ident (80M |no|state|desc|parent) [1d] [temp|ident|parent]
+
+    my ($ident, $value, $time, $type) = @_;
+
+    unless ($ident){ # list all limits
+
+        my @limit = exe ("list_limits");
+        my @limit_val;
+        
+        foreach (@limit){
+            @limit_val = split_res ($_);
+            $limit_val [2] = '-' if ($limit_val [2] eq '');
+            $limit_val [3] = '-' if ($limit_val [3] eq '');
+            $limit_val [4] = '-' if ($limit_val [4] eq '');
+            $limit_val [5] = '-' if ($limit_val [5] eq '');
+            printf ("%s %-16s %-16s %6s %6s %s %s %s %s\n", @limit_val);
+        }
+        return;
+    }
+
+    $type = cword ($menu {type}, $type); # complete type
+    $type = $type {$type};
+
+    my @val; # limit fields
+
+    unless ($type){
+
+		($type, @val) = split_res (exe("get_anylimit", $ident));
+
+        unless (defined $value){ # print limit
+            if (@val){
+                $val[1] = "-" if ($val[1] eq "");
+                $val[5] = $val[5] . " " . format_time ($val[5]);
+            }
+            @val ? print sprintf ("%s %s %s %s %s %s %s %s\n", $type, @val) : err ("Not found");
+            return;
+        }
+        $type ||= $type {ident};
+    }
+    if ($value eq "no"){
+        err ("Not found") && return unless (@val);
+        exe ("remove_limit", $type, $ident) ? ok : err;
+        return;
+    }
+    elsif ($value =~ /^st*a*t*e*/i){
+
+        err ("Not found") && return unless (@val);
+
+        my $stat = $time;
+
+        if ($stat){
+            $stat = cword ($menu {stat}, $stat); # complete type
+            $stat = $stat {$stat};
+            unless (defined $stat){
+                err "Unknown stat value";
+                return;
+            }
+            exe ("update_limit", $type, $ident, "stat", $stat) ? ok : err;
+        }
+        return;
+    }
+    elsif ($value =~ /^pa*r*e*n*t*/){
+
+        my $par = $time;
+        unless (defined $par){
+            err ("Not found") && return unless (@val);
+            print $val [1] . "\n";
+        }
+        else {
+            unless (@val){
+                exe ("add_limit_template", $type, $ident);
+            }
+            undef $par if ($par eq "no");
+            exe ("update_limit", $type, $ident, "parent", $par) ? ok : err;            
+        }
+        return;
+    }
+    elsif ($value =~ /^de*s*c*/){
+        err ("Not found") && return unless (@val);
+        my $desc = $time;
+        unless (defined $desc){
+            print $val [6] . "\n";
+        }
+        else {
+            undef $desc if ($desc eq "no");
+            exe ("update_limit", $type, $ident, "desc", $desc) ? ok : err;
+        }
+        return;
+    }
+    elsif ($value =~ /^re*n*a*m*e*/){
+        err ("Not found") && return unless (@val);
+        my $ident2 = $time;
+        unless (defined $ident2){
+            err ("Unknown ident2");
+        }
+        else {
+            exe ("update_limit", $type, $ident, "ident", $ident2) ? ok : err;
+        }
+        return;
+    }
+    elsif ($value =~ /^ov*e*r*/){
+        if ($time eq "no"){
+            limit ($ident, "no");
+            return;
+        }
+        $type = $type {temp};
+        $value = 0;
+    }
+    $time ||= "1d";
+    exe ("add_limit", $type, $ident, uc($value), $time, 1) ? ok : err;
+}
+
+sub reset {
+
+    my $ident = shift;
+    my $res = exe ("reset_traf", $ident);
+    if ($res eq "0E0"){
+        err ("Not found");
+        return;
+    }
+    ok;
+}
+
+sub exe {
+    
+    my ($cmd, @arg) = @_;
+    return $ammsc->exe ($cmd, $profile, @arg);
+}
+
+sub format_time {
+
+    my $ts = shift;
+    my @tm = localtime ($ts);
+
+    return sprintf ("%04d-%02d-%02d %02d:%02d:%02d", $tm[5]+1900, $tm[4]+1, $tm[3], $tm[2], $tm[1], $tm[0]);
+}
+

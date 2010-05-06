@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+
+# AMMS redirector for squid
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+	    
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+			    
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use lib '/usr/lib/amms';
+use AMMS::Client;
+use strict;
+
+my $server_uri = "http://localhost:81/ammsd.fcgi";
+
+my $ammsc = AMMS::Client->new;
+unless ($ammsc->connect ($server_uri)){
+    die "Can't connect to amms daemon";
+}
+
+$|=1;
+
+my @f;
+my ($ident, $res);
+
+while (<>) {
+
+    my @f = split (/\s/);
+
+    $ident = $f [2];
+
+    $res = $ammsc->exe ("check_access", "squid", $ident);
+
+    if ($res =~ /OK/i){
+        print "\n";
+        next;
+    }
+
+    if ($ammsc->{err_desc} =~ /sys/){
+        print "http://localhost/overlim.html\n";
+        next;
+    }
+
+    print "http://localhost/deny.html\n";
+}
+

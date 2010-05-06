@@ -1,0 +1,272 @@
+#!/usr/bin/perl
+# AMMS traffic counter for SQUID
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+	    
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+			    
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+
+use Getopt::Long;
+use Socket;
+use POSIX;
+use Carp;
+
+use lib '/usr/lib/amms/';
+
+use DBI;
+use AMMS::Client;
+use Config::General;
+use Sys::Syslog qw(:standard :macros);
+use File::Tail;
+
+my $VERSION = "0.1";
+
+my ($config_file, $profile, $mode, $foreground);
+
+GetOptions ("config|c=s" => \$config_file, "profile|p=s" => \$profile, "mode|m=s" => \$mode, "foreground|f" => \$foreground);
+
+$config_file ||= "/etc/ammsd.conf";
+$profile ||= "squid";
+$mode ||= "tail";
+
+my $pid_file = "/var/run/amms-tc-$profile.pid";
+
+my (%config, $squid_access_file);
+
+sub load_config {
+    %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
+    $squid_access_file = $config {$profile}{tc}{access_file} || "/var/log/squid/access.log";
+    openlog ('amms-tc-$profile', $config {$profile}{tc}{log}{options} || 'ndelay,pid', $config {$profile}{tc}{log}{facility} || 'daemon');
+}
+
+my $op = $ARGV [0] || "";
+
+start:
+
+if ($op =~ /^start$/i){
+
+    load_config ();
+
+    if ($mode =~ /tail/i){
+        my $ref = tie *LOG, "File::Tail", (name=>$squid_access_file, interval=>5, maxinterval=>10);
+    }
+    elsif ($mode =~ /batch/i){
+        unless ($foreground){
+            error ("Run this in foreground mode (-f)", 1);
+        }
+        unless (open (LOG, "<$squid_access_file")){
+            error ("Can't open $squid_access_file in batch mode ($!)", 1);
+        }
+    }
+    elsif ($mode =~ /stdin/i){
+        unless ($foreground){
+            error ("Run this in foreground mode (-f)", 1);
+        }
+        *LOG = *STDIN;
+    }
+
+    run ($foreground);
+}
+elsif ($op =~ /^stop$/i){
+    if (stop ()){ # kill running instance
+    	print "OK\n";
+    }
+    exit;
+}
+elsif ($op =~ /^restart$/i){
+    print "Restarting...\n";
+    stop ();
+    $op = "start";
+    goto start;
+}
+elsif ($op =~ /^status$/i){
+    status ();
+    exit;
+}
+elsif ($op =~ /^version$/i){
+    print "$VERSION\n";
+    exit;
+}
+else {
+    print "amms-tc-squid $VERSION\n";
+    print "Usage: amms-tc-squid [--config|-c file] [--foreground|-f] [--profile|-p] [--mode|-m] start|stop|restart|version\n";
+    exit;
+}
+
+sub status {
+
+    my $pid;
+
+    if (open (FH, "<$pid_file")){
+        $pid = <FH>;
+	    close FH;
+    }
+    
+    if ($pid){
+        if (kill (0, $pid)){
+	        print "Running with pid $pid\n";
+	        return;
+	    }
+        else {
+	        print "Abnormal previous termination\n";
+        }
+    }
+    print "Not running\n";
+}
+
+sub run {
+
+    my $fg = shift;
+    my $pid;
+    
+    $0 = "amms-tc-$profile";
+    
+    if (open (FH, "<$pid_file")){
+        $pid = <FH>;
+	    close FH;
+    }
+    
+    if ($pid){
+        if (kill (0, $pid)){
+	        error ("Already running with pid $pid", 1);
+	    }
+        else {
+	        error ("Abnormal previous termination");
+	        unlink $pid_file or error ("Can't unlink pid file: $!", 1);
+	        error ("Old pid file removed");
+        }
+    }
+    
+    return if $fg; # foreground mode
+    
+    # background mode
+    
+    $| = 1;
+    print "Running in background mode\n";
+    
+    chdir '/' or error ("Can't chdir to /: $!", 1);
+    umask 0;
+    
+    open STDIN, '/dev/null'   or error ("Can't read /dev/null: $!", 1);
+    open STDOUT, '>/dev/null' or error ("Can't write to /dev/null: $!", 1);
+    open STDERR, '>/dev/null' or error ("Can't write to /dev/null: $!", 1);
+
+    defined ($pid = fork)  or error ("Can't fork: $!");
+    exit if $pid;
+    setsid or error ("Can't start a new session: $!", 1);
+    
+    open (FH, ">$pid_file") or error ("Can't write pid file: $!", 1);
+    print FH $$;
+    close FH;
+
+    chmod 0644, $pid_file;
+
+    syslog ('notice', "Run OK");
+}
+
+sub stop {
+    
+    my $pid;
+    
+    if (open (FH, "<$pid_file")){
+        $pid = <FH>;
+	    close FH;
+    }        
+    if ($pid){
+	    unlink $pid_file;
+	    return kill ("TERM", $pid);
+    }
+    return 0;
+}
+
+sub error {
+    
+    my ($msg, $die) = @_;
+    
+    $| = 1;
+    
+    syslog (LOG_ERR, $msg);
+    $die ? croak $msg : carp $msg;
+}
+
+my ($dbh, $sth_tlog);
+
+sub db_connect {
+
+    $dbh = DBI->connect ($config {$profile}{db}{dsn}, $config {$profile}{db}{user}, $config{$profile}{db}{pass},
+                       {PrintError => 1, AutoCommit => 1});
+
+    return undef unless $dbh;
+
+    $sth_tlog = $dbh->prepare(qq{
+        INSERT INTO tlog (ts,ip,rcode,size,method,url,ident,mime,hit) VALUES (FROM_UNIXTIME(?),?,?,?,?,?,?,?,?)});
+
+    return $dbh;
+}
+
+my ($ammsc, $ignor);
+
+$ammsc = AMMS::Client->new;
+unless ($ammsc->connect ($config {$profile}{tc}{ammsd})){
+    error ("Can't connect to amms daemon", 1);
+}
+
+if ($config {$profile}{tc}{use_ignore_list}){
+    $ignor = AMMS::Client->new;
+    unless ($ignor->connect ($config {$profile}{tc}{matchd})){
+        error ("Can't connect to match daemon", 1);
+    }
+}
+
+my @field;
+my ($ts,$ip,$rcode,$size,$method,$url,$ident,$mime);
+my ($hit, $size_hit);
+
+while (<LOG>){
+
+    unless ($dbh && $dbh->ping){
+        next unless db_connect;
+    }
+    
+    @field = split (/\s+/, $_);
+    ($ts,$ip,$rcode,$size,$method,$url,$ident,$mime) = @field [0,2,3,4,5,6,7,9];
+
+    if ($config {$profile}{tc}{use_ignore_list}){
+        next if $ignor->exe ("check", $profile, "ignor", $url);
+    }
+
+    my ($type, $http_rcode) = split (/\//, $rcode, 2);
+
+    next if ($http_rcode >= 400 and !$config{$profile}{tc}{count_all_codes});
+
+    $size_hit = $hit = 0;
+
+    $ts  = substr ($ts, 0, -4);             # strip millisecs
+    $hit = 1 if ($type =~ /hit/i);          # check hit word
+    $ip  = unpack ("I", inet_aton ($ip));
+
+    $sth_tlog->execute ($ts,$ip,$rcode,$size,$method,$url,$ident,$mime,$hit);
+
+    if ($hit){
+    	$size_hit = $size;
+        $size = 0;
+    }
+
+    if ($method =~ /[gc][eo][tn]/i){ # GET | CONNECT
+        $ammsc->exe ("add_traf", $profile, $ident, $size, $size_hit);
+    }
+}
+
+
+
+

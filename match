@@ -1,0 +1,53 @@
+#!/usr/bin/perl
+# Client for match daemon
+# (C) 2010
+
+use strict;
+use lib "/usr/lib/amms";
+use AMMS::Client;
+use Getopt::Long;
+
+my ($table, $uri, $profile);
+
+GetOptions ("table|t=s" => \$table, "uri|u=s" => \$uri, "p|profile=s" => \$profile);
+
+my $cmd = $ARGV [0] || 'ls';
+
+my $match = AMMS::Client->new;
+   $match->connect ($uri) || die "Can't connect to matchd URI: $uri";
+
+my $list = $match->exe ("ls", $profile, $table, '.');
+my @list = split (/\s/, $list);
+
+if ($cmd =~ /ls*/i){
+
+    my $i=1;
+
+    foreach (@list){
+        printf ("%-6d %s\n", $i, $_);
+        $i++;
+    }
+}
+elsif ($cmd =~ /ad*d*/){
+    print "OK\n" if $match->exe ("add", $profile, $table, $ARGV [1]);
+}
+elsif ($cmd =~ /re*m*/){
+    
+    my $num = $ARGV [1];
+
+    if ($ARGV [1] > @list || $ARGV [1] < 1){
+        print  "ERR Bad index\n";
+        exit;
+    }
+
+    $ARGV[1]--;
+
+    my $rule = $list [$ARGV [1]];
+    print "OK\n" if $match->exe ("rem", $profile, $table, $rule);
+}
+elsif ($cmd =~ /ch*e*c*k*/){
+    print $match->exe ("check", $profile, $table, $ARGV [1]);
+}
+else { # print help
+    print "Options: --table|-t table --uri|-u uri --profile|-p profile (ls|add uri|rem num)\n";
+}

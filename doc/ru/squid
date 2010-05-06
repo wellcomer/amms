@@ -1,0 +1,8 @@
+acl thbank proxy_auth REQUIRED
+acl bypass url_regex "/etc/squid/bypass"
+
+http_access allow thbank
+
+url_rewrite_program /usr/local/bin/ammsrd
+url_rewrite_access deny bypass
+

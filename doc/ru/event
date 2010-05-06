@@ -1,0 +1,18 @@
+Наименование события:
+
+имя программы или модуля
+имя функции
+имя события
+
+check_access.enable type ident
+
+Разрешение доступа
+type (T|I|P)
+ident идентификатор лимита
+
+check_access.disable type ident
+
+Отключение доступа
+type (T|I|P)
+ident идентификатор лимита
+

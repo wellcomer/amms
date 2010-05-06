@@ -1,0 +1,60 @@
+ 
+# AMMS configuration
+
+    <ammsd>
+        socket = :9000
+        queue = 128
+        instances = 3
+        user = nobody
+    </ammsd>
+
+    <squid>
+
+        hit_count = 0
+        timer = abs
+
+        <db>
+            dsn  = dbi:mysql:amms_squid:skynet:3306
+            user = amms
+            pass = amms
+    	</db>
+
+        amms_dir = /usr/lib/amms
+        ammsd_uri = http://localhost:81/ammsd.fcgi
+        matchd_uri = http://localhost:81/matchd.fcgi
+
+        <extension>
+            event.disabled = sh echo
+            pwd = sh /bin/ls -l /tmp/
+            ignore = sh $amms_dir/match -p squid -t ignor -u $matchd_uri
+            import = sh $amms_dir/import -p squid -c $amms_dir/conf --
+            stat = sh $amms_dir/stat $ammsd_uri
+            history = sh $amms_dir/history -p squid -c $amms_dir/conf --
+            ext = sh $amms_dir/ext -u $ammsd_uri --
+            traf = sh $amms_dir/traf -p squid -c $amms_dir/conf
+        </extension>
+
+        <matchd>
+            socket = :9001
+            queue = 128
+            instances = 3
+            user = nobody
+    	    <ignor>
+                check_domain_only = 1
+	        </ignor>
+        </matchd>
+
+        <tc>
+            access_file = /var/log/squid/access.log
+            use_ignore_list = 1
+            count_all_codes = 0
+            ammsd = $ammsd_uri
+            matchd = $matchd_uri
+        </tc>
+
+        <event>
+            check_access.disable = event.disabled >> /tmp/disabled.log
+        </event>
+
+    </squid>
+

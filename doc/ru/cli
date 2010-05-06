@@ -1,0 +1,16 @@
+ amms (account management system)
+
+ Формат командной строки:
+
+ ammsc -u|--url -p|--profile cmd
+
+ Встроенные функции:
+
+ Лимиты:
+
+ ammsс limit [ident] [80M |no|state|desc|parent|rename|over] [1d|no] [temp|ident|parent]
+
+ Трафик:
+
+ ammsс reset ident
+

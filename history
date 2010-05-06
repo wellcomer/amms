@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+
+use strict;
+
+use DBI;
+use Config::General;
+use Getopt::Long;
+use Socket;
+
+my %config;
+my ($profile, $config_file);
+
+sub load_config {
+    
+    $config_file ||= '/etc/ammsd.conf';
+
+    %config = ();    
+    %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
+    
+    my $keys_count = scalar keys (%config);
+    
+    unless ($keys_count){
+	    die "Bad configuration in $config_file";
+    }
+
+    return $keys_count;
+}
+
+GetOptions ("profile|p=s" => \$profile, "config|c=s" => \$config_file);
+load_config ();
+
+my $dbh = DBI->connect ($config {$profile}{db}{dsn}, $config {$profile}{db}{user}, $config{$profile}{db}{pass},
+                       {RaiseError => 1, PrintError => 1, AutoCommit => 1});
+
+my ($ident, $date, $count) = @ARGV;
+
+$date ||= '.';
+$count ||= 25;
+
+my $rec = $dbh->selectall_arrayref ("select * from tlog where ident=? and ts REGEXP ? order by ts desc limit ?", undef, $ident, $date, $count);
+my @val;
+
+for (@$rec){
+
+    @val = @{$_};
+    $val [1] = inet_ntoa (pack ("I", $val [1]));
+    pop @val;
+    
+    print join (" ", @val);
+    print "\n";
+}
+
+
+
