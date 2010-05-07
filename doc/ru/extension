@@ -1,52 +1,49 @@
 Профиль squid:
 
-Игнорируемые для подсчета адреса.
-
-    ignore 
+Расшифровка параметров модулей:
 
     -p - профиль
     -t - имя таблицы БД
-    -u - matchd uri
+    -u - uri
+    -c - конфигурационный файл
+
+Игнорируемые для подсчета адреса.
+
+    ignore -p profile -t table -u matchd_uri [ls|rem|add] [num|rec]
+
     ls - просмотр
-    rem num - удалить запись
+    rem num - удалить запись c порядковым номером num
     add rec - добавить запись rec
 
 Импорт лимитов в БД
 
-    import
+    import -p profile -c config_file filename
 
-    -p - профиль
-    -c - конфигурационный файл
     filename - имя файла для импорта
 
 Объем использованного трафика
 
-    stat 
+    stat uri ident
 
     uri - ammsd uri
     ident - идентификатор пользователя, если не указан выводится статистика по всем пользователям
 
 История (журнал) посещаемых сайтов
 
-    history
+    history -p profile -c config_file ident time count
 
-    -p - профиль
-    -c - конфигурационный файл
     ident - идентификатор пользователя
     time - время (regexp), если не указано выводится последние 25 записей
     count - количество выводимых записей
 
 Список расширений
 
-    ext 
-
-    -u - ammsd uri
+    ext -u ammsd_uri
 
 Объем трафика пользователя за временной промежуток
 
-    traf
+    traf -p profile -c config_file ident time
 
-    -p - профиль
-    -c - конфигурационный файл
     ident - идентификатор пользователя
     time - время (regexp)
+

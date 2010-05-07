@@ -46,7 +46,7 @@ my (%config, $squid_access_file);
 sub load_config {
     %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
     $squid_access_file = $config {$profile}{tc}{access_file} || "/var/log/squid/access.log";
-    openlog ('amms-tc-$profile', $config {$profile}{tc}{log}{options} || 'ndelay,pid', $config {$profile}{tc}{log}{facility} || 'daemon');
+    openlog ("amms-tc-$profile", $config {$profile}{tc}{log}{options} || 'ndelay,pid', $config {$profile}{tc}{log}{facility} || 'daemon');
 }
 
 my $op = $ARGV [0] || "";
