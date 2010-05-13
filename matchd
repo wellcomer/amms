@@ -46,7 +46,7 @@ GetOptions ("config|c=s" => \$config_file, "profile|p=s" => \$profile, "foregrou
 
 sub load_config {
 
-    $config_file ||= "/etc/ammsd.conf";
+    $config_file ||= "/etc/amms.conf";
     $profile ||= "default";
     %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
     openlog ('matchd', $config {$profile}{matchd}{log}{options} || 'ndelay,pid', $config {$profile}{matchd}{log}{facility} || 'daemon');

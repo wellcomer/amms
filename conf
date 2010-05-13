@@ -2,19 +2,19 @@
 # AMMS configuration
 
     <ammsd>
-        socket = :9000
-        queue = 128
+        socket = :9000 # address and port to listen
+        queue = 128    # request queue length
         instances = 3
-        user = nobody
+        user = nobody  # privileges
     </ammsd>
 
     <squid>
 
-        hit_count = 0
-        timer = abs
+        hit_count = 0  # count HIT_ codes in squid log
+        timer = abs    # timer type (abs - absolute, rel - relative)
 
         <db>
-            dsn  = dbi:mysql:amms_squid:skynet:3306
+            dsn  = dbi:mysql:amms_squid:skynet:3306 # dbi:driver:db_name:host:port
             user = amms
             pass = amms
     	</db>
@@ -40,14 +40,14 @@
             instances = 3
             user = nobody
     	    <ignor>
-                check_domain_only = 1
-	        </ignor>
+                check_domain_only = 1 # check uri for domain part only
+	    </ignor>
         </matchd>
 
         <tc>
-            access_file = /var/log/squid/access.log
-            use_ignore_list = 1
-            count_all_codes = 0
+            access_file = /var/log/squid/access.log # squid access file location
+            use_ignore_list = 1 # don't count sites in ignore map
+            count_all_codes = 0 # count all http reply codes (3хх,4xx,5xx)
             ammsd = $ammsd_uri
             matchd = $matchd_uri
         </tc>

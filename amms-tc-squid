@@ -35,7 +35,7 @@ my ($config_file, $profile, $mode, $foreground);
 
 GetOptions ("config|c=s" => \$config_file, "profile|p=s" => \$profile, "mode|m=s" => \$mode, "foreground|f" => \$foreground);
 
-$config_file ||= "/etc/ammsd.conf";
+$config_file ||= "/etc/amms.conf";
 $profile ||= "squid";
 $mode ||= "tail";
 

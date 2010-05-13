@@ -1,3 +1,6 @@
+CREATE DATABASE `amms_squid`;
+USE `amms_squid`;
+
 CREATE TABLE `lim` (
   `type` varchar(1) NOT NULL default '',
   `ident` varchar(24) NOT NULL default '',
@@ -8,7 +11,7 @@ CREATE TABLE `lim` (
   `ts` timestamp NOT NULL default '0000-00-00 00:00:00',
   `desc` varchar(64) character set utf8 default NULL,
   PRIMARY KEY  (`type`,`ident`)
-) ENGINE=MyISAM
+);
 
 CREATE TABLE `tlog` (
   `ts` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
@@ -20,17 +23,17 @@ CREATE TABLE `tlog` (
   `ident` varchar(24) default NULL,
   `mime` varchar(64) default NULL,
   `hit` tinyint(1) default '0'
-) ENGINE=MyISAM
+);
 
 CREATE TABLE `traf` (
   `ident` varchar(24) NOT NULL default '',
   `size` int(10) unsigned default NULL,
   `size_hit` int(10) unsigned default NULL,
   PRIMARY KEY  (`ident`)
-) ENGINE=MyISAM
+);
 
 CREATE TABLE `ignor` (
   `address` varchar(128) NOT NULL default '',
   PRIMARY KEY  (`address`)
-) ENGINE=MyISAM
+);
 

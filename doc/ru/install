@@ -1,0 +1,47 @@
+
+ Рекомендуемая установка стабильной версии amms:
+
+ Перейдите в целевой каталог установки (может быть произвольным), к примеру:
+
+ cd /home/user
+ git clone git://github.com/wellcomer/amms.git
+
+ создайте символическую ссылку:
+
+ ln -s /home/user/amms /usr/lib/amms
+
+ Скопируйте конфигурационный файл conf в /etc/amms.conf
+ и отредактируйте его под свои нужды.
+
+ Создайте БД:
+
+ mysql < /usr/lib/amms/doc/db
+
+ Зависимости:
+
+ ammsc
+
+ perl -MCPAN -e "install HTTP::MHTTP"
+
+ ammsd
+
+ FCGI::ProcManager
+ Config::General
+ Params::Validate
+ DBI
+ DBD::mysql
+
+ matchd
+
+ Net::IP::CMatch
+
+ amms-tc-squid
+
+ File::Tail
+
+ Порядок запуска:
+
+ ammsd
+ matchd
+ amms-tc-squid 
+
