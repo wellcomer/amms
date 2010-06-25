@@ -20,22 +20,37 @@ use AMMS::Client;
 use strict;
 
 my $server_uri = "http://localhost:81/ammsd.fcgi";
+my $hashd_uri = "http://localhost:81/hashd.fcgi";
 
 my $ammsc = AMMS::Client->new;
 unless ($ammsc->connect ($server_uri)){
     die "Can't connect to amms daemon";
 }
 
+my $hashd = AMMS::Client->new;
+unless ($hashd->connect ($hashd_uri)){
+    undef $hashd;
+}
+
 $|=1;
 
 my @f;
-my ($ident, $res);
+my ($ident, $ip, $res);
 
 while (<>) {
 
     my @f = split (/\s/);
 
+    $ip = substr ($f [1], 0, -2);
     $ident = $f [2];
+    
+    if ($hashd){
+	$res = $hashd->exe ("check2", "squid", "lock", $ident, $ip);
+	if ($res !~ /OK/i){
+	    print "http://localhost/deny_by_ip.html\n";
+	    next;
+	}
+    }
 
     $res = $ammsc->exe ("check_access", "squid", $ident);
 

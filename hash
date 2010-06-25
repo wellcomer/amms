@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+# Client for hash daemon
+# (C) 2010
+
+use strict;
+use lib "/usr/lib/amms";
+use AMMS::Client;
+use Getopt::Long;
+
+my ($table, $uri, $profile);
+
+GetOptions ("table|t=s" => \$table, "uri|u=s" => \$uri, "p|profile=s" => \$profile);
+
+my $cmd = $ARGV [0] || 'ls';
+
+my $hash = AMMS::Client->new;
+   $hash->connect ($uri) || die "Can't connect to hashd URI: $uri";
+
+my @list = $hash->exe ("get_all", $profile, $table);
+
+if ($cmd =~ /ls*/i){
+
+    my $i=1;
+
+    foreach (@list){
+        my ($key, $val) = split (/\s/);
+        printf ("%-4d %-16s %s\n", $i, $key, $val);
+        $i++;
+    }
+}
+elsif ($cmd =~ /se*t*/){
+    print "OK\n" if $hash->exe ("set", $profile, $table, $ARGV [1], $ARGV [2]);
+}
+elsif ($cmd =~ /re*m*/){
+    
+    my $num = $ARGV [1];
+
+    if ($ARGV [1] > @list || $ARGV [1] < 1){
+        print  "ERR Bad index\n";
+        exit;
+    }
+
+    $ARGV[1]--;
+
+    my $keyval = $list [$ARGV [1]];
+    my ($key, $val) = split (/\s/, $keyval);
+
+    print "OK\n" if $hash->exe ("rem", $profile, $table, $key, $val);
+}
+elsif ($cmd =~ /ch*e*c*k*/){
+    print $hash->exe ("check", $profile, $table, $ARGV [1], $ARGV [2]);
+}
+elsif ($cmd =~ /ge*t*/){
+    print $hash->exe ("get", $profile, $table, $ARGV [1]);
+}
+else { # print help
+    print "Options: --table|-t table --uri|-u uri --profile|-p profile (ls|set key val|rem num|check key val)\n";
+}

@@ -10,3 +10,7 @@ location /matchd.fcgi {
 	include fastcgi_params;
 }
 
+location /hashd.fcgi {
+	fastcgi_pass   127.0.0.1:9002;
+	include fastcgi_params;
+}

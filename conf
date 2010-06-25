@@ -22,11 +22,13 @@
         amms_dir = /usr/lib/amms
         ammsd_uri = http://localhost:81/ammsd.fcgi
         matchd_uri = http://localhost:81/matchd.fcgi
+        hashd_uri = http://localhost:81/hashd.fcgi
 
         <extension>
             event.disabled = sh echo
             pwd = sh /bin/ls -l /tmp/
             ignore = sh $amms_dir/match -p squid -t ignor -u $matchd_uri
+            lock = sh $amms_dir/hash -p squid -t lock -u $hashd_uri
             import = sh $amms_dir/import -p squid -c $amms_dir/conf --
             stat = sh $amms_dir/stat $ammsd_uri
             history = sh $amms_dir/history -p squid -c $amms_dir/conf --
@@ -43,6 +45,13 @@
                 check_domain_only = 1 # check uri for domain part only
 	    </ignor>
         </matchd>
+
+        <hashd>
+            socket = :9002
+            queue = 128
+            instances = 3
+            user = nobody
+        </hashd>
 
         <tc>
             access_file = /var/log/squid/access.log # squid access file location

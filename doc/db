@@ -37,3 +37,7 @@ CREATE TABLE `ignor` (
   PRIMARY KEY  (`address`)
 );
 
+CREATE TABLE `lock` (
+  `v1` varchar(255) NOT NULL default '',
+  `v2` varchar(255) NOT NULL default ''
+);
