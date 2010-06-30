@@ -1,4 +1,4 @@
-# AMMS client module (C) 2009
+# AMMS client module (C) 2010
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@ use strict;
 
 package AMMS::Client;
 
-use HTTP::MHTTP;
+use HTTP::Lite;
 use URI::Escape;
 
 my $VERSION = 0.1;
@@ -39,14 +39,11 @@ sub connect {
     my ($self, $uri) = @_;
 
     $self->{base_uri} = $uri;
+    $self->{http} = new HTTP::Lite;
 
-    http_init();
-    http_add_headers ('User-Agent' => __PACKAGE__ . "/$VERSION");
+    my $req = $self->{http}->request ($uri);
 
-    if (http_call ("GET", $uri)){
-        return 1 if (http_status() == 200);
-    }
-
+    return 1 if ($req == 200);
     return undef;
 }
 
@@ -55,19 +52,19 @@ sub exe {
     my $self = shift;
     my $cmd  = join (' ', @_);
 
-    http_reset ();
+    $self->{http}->reset;
 
     $cmd = uri_escape ($cmd);
-    my $res = http_call ("GET", $self->{base_uri} . "?q=$cmd");
+    my $res = $self->{http}->request ($self->{base_uri} . "?q=$cmd");
 
-    if ($res != 1) {
-        $self->{err_desc} = http_reason ();
+    unless (defined $res) {
+        $self->{err_desc} = $self->{http}->status_message;
         return undef;
     }
 
     my (@res, $line);
 
-    @res = split (/\n/, http_response ());
+    @res = split (/\n/, $self->{http}->body);
 
     unless ($self->{c2c}){
 
