@@ -28,6 +28,8 @@ unless ($ident){ # list all stats
         $traf2 {$ident} = $t2;
     }
 
+    my @lsort;
+
     foreach (@limit){
 
         @val = split (/\s/, $_);
@@ -46,8 +48,14 @@ unless ($ident){ # list all stats
         }
 
         # 0type 1ident 2parent 3traf 4cached 5limit 6period 7stat 8ts 9comment
-        printf ("%s %-16s %-16s %10s %10s %6s %6s %s %s %s %s\n", @val2);
+        push @lsort, sprintf ("%s %-16s %-16s %10s %10s %6s %6s %s %s %s %s\n", @val2);
     }
+
+    @lsort = sort @lsort;
+
+	foreach (@lsort){
+		print;
+	}
 }
 else { # show specified stat
 
