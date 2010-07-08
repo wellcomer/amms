@@ -53,9 +53,9 @@ unless ($ident){ # list all stats
 
     @lsort = sort @lsort;
 
-	foreach (@lsort){
-		print;
-	}
+    foreach (@lsort){
+        print;
+    }
 }
 else { # show specified stat
 
@@ -85,16 +85,16 @@ sub kmg { # human readable values
     
     my $bytes = shift;
     my $value = $bytes;
-	    
+            
     my $g = 1073741824;
     my $m = 1048576;
     my $k = 1024;
-		        
+                        
     if ($bytes >= $g){
         $value = sprintf ('%.2f%s', $bytes / $g, 'G');
     }
     elsif ($bytes >= $m){
-	    $value = sprintf ('%.1f%s', $bytes / $m, 'M');
+        $value = sprintf ('%.1f%s', $bytes / $m, 'M');
     }
     elsif ($bytes >= $k){
         $value = sprintf ('%.1f%s', $bytes / $k, 'K');

@@ -21,7 +21,7 @@
 
  ammsc
 
- perl -MCPAN -e "install HTTP::MHTTP"
+ perl -MCPAN -e "install HTTP::Lite"
 
  ammsd
 

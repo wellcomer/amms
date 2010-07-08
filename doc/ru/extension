@@ -21,6 +21,9 @@
 
     filename - имя файла для импорта
 
+    Для экспорта лимитов используйте команду
+    ammsc li > filename
+
 Объем использованного трафика
 
     stat uri ident
@@ -42,8 +45,17 @@
 
 Объем трафика пользователя за временной промежуток
 
-    traf -p profile -c config_file ident time
+    traf -p profile -c config_file ident time [detail]
 
     ident - идентификатор пользователя
     time - время (regexp)
+    detail - детализация
+
+Привязка логина к IP адресу
+
+    lock -p profile -t table -u hashd_uri [ls|set ident ip|rem num|get ident|check ident ip|help]
+
+    ident - идентификатор пользователя
+    ip - IP адрес
+    num - удалить запись с порядковым номером num
 
