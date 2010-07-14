@@ -47,7 +47,7 @@
 
     traf -p profile -c config_file ident time [detail]
 
-    ident - идентификатор пользователя
+    ident - идентификатор пользователя ( . - статистика по всем пользователям )
     time - время (regexp)
     detail - детализация
 
