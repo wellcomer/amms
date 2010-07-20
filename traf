@@ -19,7 +19,7 @@ sub load_config {
     my $keys_count = scalar keys (%config);
     
     unless ($keys_count){
-	    die "Bad configuration in $config_file";
+        die "Bad configuration in $config_file";
     }
 
     return $keys_count;
@@ -96,7 +96,7 @@ if ($detail){
 else {
 
     @val = $dbh->selectrow_array ("select sum(size) from tlog where ident=? and ts REGEXP ? and (method='GET' or method='CONNECT') and hit=0",
-                                     undef,  $ident, $date);
+                                   undef,  $ident, $date);
     my $size = kmg ($val [0]);
     print $size;
 }
@@ -105,16 +105,16 @@ sub kmg { # human readable values
     
     my $bytes = shift;
     my $value = $bytes;
-	    
+            
     my $g = 1073741824;
     my $m = 1048576;
     my $k = 1024;
-		        
+                        
     if ($bytes >= $g){
         $value = sprintf ('%.2f%s', $bytes / $g, 'G');
     }
     elsif ($bytes >= $m){
-	    $value = sprintf ('%.1f%s', $bytes / $m, 'M');
+        $value = sprintf ('%.1f%s', $bytes / $m, 'M');
     }
     elsif ($bytes >= $k){
         $value = sprintf ('%.1f%s', $bytes / $k, 'K');

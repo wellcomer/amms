@@ -5,12 +5,12 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # any later version.
-	    
+        
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-			    
+                
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -63,7 +63,7 @@ sub load_config {
     syslog ('notice', "Configuration file $config_file has $keys_count keys");
     
     unless ($keys_count){
-	    error ("Bad configuration in $config_file", 1);
+        error ("Bad configuration in $config_file", 1);
     }
 
     return $keys_count;
@@ -82,7 +82,7 @@ if ($op =~ /^start$/i){
 }
 elsif ($op =~ /^stop$/i){
     if (stop ()){ # kill running instance
-    	print "OK\n";
+        print "OK\n";
     }
     exit;
 }
@@ -113,16 +113,16 @@ sub status {
 
     if (open (FH, "<$pid_file")){
         $pid = <FH>;
-	    close FH;
+        close FH;
     }
     
     if ($pid){
         if (kill (0, $pid)){
-	        print "Running with pid $pid\n";
-	        return;
-	    }
+            print "Running with pid $pid\n";
+            return;
+        }
         else {
-	        print "Abnormal previous termination\n";
+            print "Abnormal previous termination\n";
         }
     }
     print "Not running\n";
@@ -135,17 +135,17 @@ sub run {
     
     if (open (FH, "<$pid_file")){
         $pid = <FH>;
-	    close FH;
+        close FH;
     }
     
     if ($pid){
         if (kill (0, $pid)){
-	        error ("Already running with pid $pid", 1);
-	    }
+            error ("Already running with pid $pid", 1);
+        }
         else {
-	        error ("Abnormal previous termination");
-	        unlink $pid_file or error ("Can't unlink pid file: $!", 1);
-	        error ("Old pid file removed");
+            error ("Abnormal previous termination");
+            unlink $pid_file or error ("Can't unlink pid file: $!", 1);
+            error ("Old pid file removed");
         }
     }
     
@@ -183,11 +183,11 @@ sub stop {
     
     if (open (FH, "<$pid_file")){
         $pid = <FH>;
-	    close FH;
+        close FH;
     }        
     if ($pid){
-	    unlink $pid_file;
-	    return kill ("TERM", $pid);
+        unlink $pid_file;
+        return kill ("TERM", $pid);
     }
 }
 
@@ -215,9 +215,9 @@ if ($user){
     use User::pwent;
     my $pw = getpwnam ($user) || error ("Unknown user $user", 1);
 
-	if (POSIX::setgid ($pw->gid)){
+    if (POSIX::setgid ($pw->gid)){
         syslog ('notice', "group id " . $pw->gid);
-	}
+    }
     if (POSIX::setuid ($pw->uid)){
         syslog ('notice', "user $user id " . $pw->uid);
     }
@@ -228,9 +228,9 @@ while ($request->Accept() >= 0) {
     pm_pre_dispatch ();
 
     my ($req, $cmd, @arg, @res, $res);
-	
-	$req = $ENV {QUERY_STRING};
-	$req =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
+    
+    $req = $ENV {QUERY_STRING};
+    $req =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
     $req = substr ($req, 2);
 
     ($cmd,@arg) = split (/\s/, $req);
@@ -396,7 +396,7 @@ sub add_limit {
 
     $dbh->do ("delete from lim where type=? and ident=?", undef, $type, $ident);
     my $res = $dbh->do ("insert into lim(`type`,`ident`,`value`,`period`,`stat`,`desc`) values(?,?,?,?,?,?)",
-                      undef, $type, $ident, $value, $period, $stat, $desc);
+                         undef, $type, $ident, $value, $period, $stat, $desc);
 
     update_limit_ts ($db_name, $type, $ident, $period);
 
@@ -566,6 +566,12 @@ sub check_access {
         }
         return "ERR disabled by sys";
     }
+
+    if ($stat == 0){ # keep actual stat after reset_traf
+        update_limit ($db_name, $type, $ident, stat => 1);
+        event ($db_name, "check_access.enable", $type, $ident);
+    }
+
     return "OK";
 }
 

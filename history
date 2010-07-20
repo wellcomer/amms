@@ -20,7 +20,7 @@ sub load_config {
     my $keys_count = scalar keys (%config);
     
     unless ($keys_count){
-	    die "Bad configuration in $config_file";
+        die "Bad configuration in $config_file";
     }
 
     return $keys_count;

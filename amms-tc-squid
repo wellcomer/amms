@@ -5,12 +5,12 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # any later version.
-	    
+        
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-			    
+                
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -79,7 +79,7 @@ if ($op =~ /^start$/i){
 }
 elsif ($op =~ /^stop$/i){
     if (stop ()){ # kill running instance
-    	print "OK\n";
+        print "OK\n";
     }
     exit;
 }
@@ -109,16 +109,16 @@ sub status {
 
     if (open (FH, "<$pid_file")){
         $pid = <FH>;
-	    close FH;
+        close FH;
     }
     
     if ($pid){
         if (kill (0, $pid)){
-	        print "Running with pid $pid\n";
-	        return;
-	    }
+            print "Running with pid $pid\n";
+            return;
+        }
         else {
-	        print "Abnormal previous termination\n";
+            print "Abnormal previous termination\n";
         }
     }
     print "Not running\n";
@@ -133,17 +133,17 @@ sub run {
     
     if (open (FH, "<$pid_file")){
         $pid = <FH>;
-	    close FH;
+        close FH;
     }
     
     if ($pid){
         if (kill (0, $pid)){
-	        error ("Already running with pid $pid", 1);
-	    }
+            error ("Already running with pid $pid", 1);
+        }
         else {
-	        error ("Abnormal previous termination");
-	        unlink $pid_file or error ("Can't unlink pid file: $!", 1);
-	        error ("Old pid file removed");
+            error ("Abnormal previous termination");
+            unlink $pid_file or error ("Can't unlink pid file: $!", 1);
+            error ("Old pid file removed");
         }
     }
     
@@ -180,11 +180,11 @@ sub stop {
     
     if (open (FH, "<$pid_file")){
         $pid = <FH>;
-	    close FH;
+        close FH;
     }        
     if ($pid){
-	    unlink $pid_file;
-	    return kill ("TERM", $pid);
+        unlink $pid_file;
+        return kill ("TERM", $pid);
     }
     return 0;
 }
@@ -258,7 +258,7 @@ while (<LOG>){
     $sth_tlog->execute ($ts,$ip,$rcode,$size,$method,$url,$ident,$mime,$hit);
 
     if ($hit){
-    	$size_hit = $size;
+        $size_hit = $size;
         $size = 0;
     }
 
