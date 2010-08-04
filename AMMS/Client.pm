@@ -58,7 +58,7 @@ sub exe {
     my $res = $self->{http}->request ($self->{base_uri} . "?q=$cmd");
 
     unless (defined $res) {
-        $self->{err_desc} = $self->{http}->status_message;
+        $self->{err_desc} = $self->{http}->status_message || "Connection failed";
         return undef;
     }
 
