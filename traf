@@ -40,48 +40,115 @@ if ($date =~ /to*d*a*y*/i){
     $date = sprintf ("%04d-%02d-%02d", $tm[5]+1900, $tm[4]+1, $tm[3]);
 }
 
-if ($ident eq '.') {
+if ($detail){ # detailed traffic ordered by value
+    traf_details ($ident, $date);
+    exit;
+}
 
-    $dbh->do ("create temporary table th0 (index (ident)) select ident,size from tlog where ts regexp ?
-               and (method='GET' or method='CONNECT') and hit=0", undef, $date);
+unless (traf_tval ($ident, $date)){ # if no fast result from tval
+        traf_tlog ($ident, $date);  # get it slow from tlog
+}
 
-    $dbh->do ("create temporary table th1 (index (ident)) select ident,size from tlog where ts regexp ?
-               and (method='GET' or method='CONNECT') and hit=1", undef, $date);
+sub traf_tval { # fast
 
-    my $ident = $dbh->selectcol_arrayref ("select distinct ident from th0");
+    my ($ident, $date) = @_;
 
-    my @size;
-    my $desc;
+    if ($ident eq '.'){ # all
 
-    for (@$ident){
+        # t0 = traf with timestamps        
+        $dbh->do ("create temporary table t0 select ident,size,size_hit,ts from traf cross join lim using(ident)");
+        # t0 = traf with ts = date
+        $dbh->do ("delete from t0 where ts not regexp ?", undef, $date);
+        # t0 = traf + tval ts=date
+        $dbh->do ("insert into t0 select * from tval where ts regexp ?", undef, $date);
+        # t1 = t0 with sum. values
+        $dbh->do ("create temporary table t1 select ident,sum(size),sum(size_hit) from t0 group by ident");
+        # t1 + desc
+        $ident = $dbh->selectall_arrayref ("select ident,`sum(size)`,`sum(size_hit)`,`desc` from t1 cross join lim using(ident) order by ident");
 
-        @size = ();
-        $desc = '';
+        return undef unless (@$ident);
 
-        $desc = $dbh->selectrow_array ("select `desc` from lim where ident=?", undef, $_);
+        for (@$ident){
 
-        $size [2] = $dbh->selectrow_array ("select sum(size) from th0 where ident=?", undef, $_) || '0';
-        $size [3] = $dbh->selectrow_array ("select sum(size) from th1 where ident=?", undef, $_) || '0';
+            my ($name, $size, $size_hit, $desc) = @$_;
+            printf ("%-16s %7s %7s %12s %12s %s\n", $name, kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit, $desc);
+        }
+
+        my ($size, $size_hit) = $dbh->selectrow_array ("select sum(size), sum(size_hit) from t0");
+
+        printf ("\n%-16s %7s %7s %12s %12s\n", "Total",  kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit);
+    }
+    else {
+
+        $dbh->do ("create temporary table t0 select ident,size,size_hit,ts from traf cross join lim using(ident) where ident=?", undef, $ident);
+        $dbh->do ("delete from t0 where ts not regexp ?", undef, $date);
+        $dbh->do ("insert into t0 select * from tval where ts regexp ? and ident=?", undef, $date, $ident);
+        $dbh->do ("create temporary table t1 select ident,sum(size),sum(size_hit) from t0 group by ident");
+        my @ident = $dbh->selectrow_array ("select ident,`sum(size)`,`sum(size_hit)`,`desc` from t1 cross join lim using(ident)");
+
+        return undef unless (@ident);
+
+        my ($name, $size, $size_hit, $desc) = @ident;
+        printf ("%s %s %s %s %s %s\n", $name, kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit, $desc);
+    }
+}
+
+sub traf_tlog { # slow accurate
+
+    my ($ident, $date) = @_;
+
+    $dbh->do ("drop table t0");
+
+    if ($ident eq '.') { # all
+
+        $dbh->do ("create temporary table t0 (index (ident)) select ident,size from tlog where ts regexp ?
+                   and (method='GET' or method='CONNECT')", undef, $date);
+
+        my $ident = $dbh->selectcol_arrayref ("select distinct ident from t0");
+
+        my @size;
+        my $desc;
+
+        for (@$ident){
+
+            @size = ();
+            $desc = '';
+
+            $desc = $dbh->selectrow_array ("select `desc` from lim where ident=?", undef, $_);
+
+            $size [2] = $dbh->selectrow_array ("select sum(size) from t0 where ident=? and hit=0", undef, $_) || '0'; 
+            $size [3] = $dbh->selectrow_array ("select sum(size) from t0 where ident=? and hit=1", undef, $_) || '0'; # cached
+
+            $size [0] = kmg ($size [2]) || '0';
+            $size [1] = kmg ($size [3]) || '0';
+
+            printf ("%-16s %7s %7s %12s %12s %s\n", $_, @size, $desc);
+        }
+
+        $size [2] = $dbh->selectrow_array ("select sum(size) from t0 where hit=0") || '0';
+        $size [3] = $dbh->selectrow_array ("select sum(size) from t0 where hit=1") || '0';
 
         $size [0] = kmg ($size [2]) || '0';
         $size [1] = kmg ($size [3]) || '0';
 
-        printf ("%-16s %7s %7s %12s %12s %s\n", $_, @size, $desc);
+        printf ("\n%-16s %7s %7s %12s %12s\n", "Total", @size);
     }
+    else {
 
-    $size [2] = $dbh->selectrow_array ("select sum(size) from th0") || '0';
-    $size [3] = $dbh->selectrow_array ("select sum(size) from th1") || '0';
+        $dbh->do ("create temporary table t0 select * from tlog where ident=? and ts REGEXP ? and (method='GET' or method='CONNECT')",
+                   undef, $ident, $date);
 
-    $size [0] = kmg ($size [2]) || '0';
-    $size [1] = kmg ($size [3]) || '0';
+        my $size = $dbh->selectrow_array ("select sum(size) from t0 where hit=0");
+        my $size_hit = $dbh->selectrow_array ("select sum(size) from t0 where hit=1");
+        my $desc = $dbh->selectrow_array ("select `desc` from lim where ident=?", undef, $ident);
 
-    printf ("\n%-16s %7s %7s %12s %12s\n", "Total", @size);
-
-    $dbh->do ("drop table th0, th1");
-    exit;
+        printf ("%s %s %s %s %s %s\n", $ident, kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit, $desc);
+    }
 }
 
-if ($detail){
+sub traf_details {
+
+    my ($ident, $date) = @_;
 
     my $rec = $dbh->selectall_arrayref ("select url,size from tlog where ident=? 
                                          and ts REGEXP ? 
@@ -92,13 +159,6 @@ if ($detail){
         $val [1] = kmg ($val [1]);
         printf ("%6s %s\n", $val [1], $val [0]);
     }
-}
-else {
-
-    @val = $dbh->selectrow_array ("select sum(size) from tlog where ident=? and ts REGEXP ? and (method='GET' or method='CONNECT') and hit=0",
-                                   undef,  $ident, $date);
-    my $size = kmg ($val [0]);
-    print $size;
 }
 
 sub kmg { # human readable values
