@@ -28,6 +28,7 @@ use Getopt::Long;
 use Params::Validate qw(:all);
 use POSIX;
 use Carp;
+use IPC::SysV qw(IPC_CREAT SETVAL IPC_RMID);
 
 use lib '/usr/lib/amms/';
 
@@ -45,6 +46,11 @@ my $pid_file = "/var/run/ammsd.pid";
 my $validate_type_regex = qr/(T|I|P)/;
 my $validate_value_regex = qr/\d+\.*\d*(b|k|m|g|$)/i;
 my $validate_period_regex = qr/\d+(s|m|h|d)/i;
+
+my $IPC_KEY = 29072010;
+my $IPC_OPS_WAIT = pack ("s!3", 0, 0, 0);
+my $IPC_OPS_INC  = pack ("s!3", 0, 1, 0);
+my $IPC_OPS_DEC  = pack ("s!3", 0, -1, 0);
 
 sub validation_err {
     croak shift;
@@ -175,6 +181,15 @@ sub run {
 
     syslog ('notice', "Run OK");
     syslog ('notice', sprintf ("listen on %s instances %s qlen %s", $config{ammsd}{socket}, $config{ammsd}{instances},$config{ammsd}{queue}));
+
+    # create sync instance
+
+    my $sem_id = semget ($IPC_KEY, 1, 0666 | IPC_CREAT ) || syslog ('notice', "Can't create semaphore $!");
+
+    if ($sem_id){
+        syslog ('notice', "sem id $sem_id");
+        semctl ($sem_id, 0, SETVAL, 0);
+    }
 }
 
 sub stop {
@@ -187,6 +202,8 @@ sub stop {
     }        
     if ($pid){
         unlink $pid_file;
+        my $sem_id = semget ($IPC_KEY, 0, 0);
+        semctl ($sem_id, 0, IPC_RMID, 0) if ($sem_id);
         return kill ("TERM", $pid);
     }
 }
@@ -411,7 +428,9 @@ sub add_limit_template {
     my $dbh = get_dbh ($db_name);
 
     $dbh->do ("delete from lim where type=? and ident=?", undef, $type, $ident);
-    return $dbh->do ("insert into lim(`type`,`ident`) values(?,?)", undef, $type, $ident);
+    my $res = $dbh->do ("insert into lim(`type`,`ident`) values(?,?)", undef, $type, $ident);
+
+    return $res;
 }
 
 sub remove_limit {
@@ -501,8 +520,9 @@ sub add_traf {
     $delta_size_hit ||= 0;
 
     my $dbh = get_dbh ($db_name);
-    return $dbh->do ("insert into traf (size,size_hit,ident) values (?,?,?) on duplicate key update size=size+$delta_size,
-                      size_hit=size_hit+$delta_size_hit", undef, $delta_size, $delta_size_hit, $ident);
+    my $res = $dbh->do ("insert into traf (size,size_hit,ident) values (?,?,?) on duplicate key update size=size+$delta_size,
+                         size_hit=size_hit+$delta_size_hit", undef, $delta_size, $delta_size_hit, $ident);
+    return $res;
 }
 
 sub get_traf {
@@ -520,7 +540,17 @@ sub reset_traf {
     my ($db_name, $ident) = @_;
 
     my $dbh = get_dbh ($db_name);
-    return $dbh->do ("update traf set size=0,size_hit=0 where ident=?", undef, $ident);
+
+    my ($type,$stub,$parent,$value,$period,$stat,$ts) = get_anylimit ($db_name, $ident);
+    my ($size,$size_hit) = get_traf ($db_name, $ident);
+
+    if ($dbh->do ("update traf set size=0,size_hit=0 where ident=?", undef, $ident)){
+        if ($size != 0 or $size_hit != 0){
+            $dbh->do ("insert into tval (ident,size,size_hit,ts) values (?,?,?,from_unixtime(?))", undef, $ident, $size, $size_hit, $ts);
+        }
+        return 1;
+    }
+    return undef;
 }
 
 sub check_access {
@@ -529,9 +559,21 @@ sub check_access {
 
     my ($db_name, $ident) = @_;
 
+    my $sem_id = semget ($IPC_KEY, 0, 0);
+    semop ($sem_id, $IPC_OPS_WAIT); # wait for semaphore to be zero
+    semop ($sem_id, $IPC_OPS_INC);
+
     my ($type,$stub,$parent,$value,$period,$stat,$ts) = get_anylimit ($db_name, $ident);
-    return "ERR not found" unless $type;
-    return "ERR disabled by adm" if ($stat==2);
+
+    unless ($type){
+        semop ($sem_id, $IPC_OPS_DEC);
+        return "ERR not found";
+    }
+
+    if ($stat==2){
+        semop ($sem_id, $IPC_OPS_DEC);
+        return "ERR disabled by adm";
+    }
 
     my ($size,$size_hit) = get_traf ($db_name, $ident);
 
@@ -544,18 +586,22 @@ sub check_access {
     if ($now >= ($ts + $delta_time)) { # expired limit
         if ($type eq 'T'){
             remove_limit ($db_name, $type, $ident);
+            semop ($sem_id, $IPC_OPS_DEC);
             return "OK";
         }
         else {
+
+            reset_traf ($db_name, $ident);
             update_limit_ts ($db_name, $type, $ident, $period);
             update_limit ($db_name, $type, $ident, stat => 1) if ($stat == 0); # enable
-            reset_traf ($db_name, $ident);
             event ($db_name, "check_access.enable", $type, $ident);
+            semop ($sem_id, $IPC_OPS_DEC);
             return "OK";
         }
     }
 
     if ($size_limit==0){ # unlim
+        semop ($sem_id, $IPC_OPS_DEC);
         return "OK";
     }
 
@@ -564,6 +610,7 @@ sub check_access {
             update_limit ($db_name, $type, $ident, stat => 0);
             event ($db_name, "check_access.disable", $type, $ident);
         }
+        semop ($sem_id, $IPC_OPS_DEC);
         return "ERR disabled by sys";
     }
 
@@ -572,6 +619,7 @@ sub check_access {
         event ($db_name, "check_access.enable", $type, $ident);
     }
 
+    semop ($sem_id, $IPC_OPS_DEC);
     return "OK";
 }
 
@@ -629,6 +677,8 @@ sub event {
 
     my ($profile_name, $event_name, @argv) = @_;
     
+    syslog ('notice', $event_name . " " . join (" ", @argv));
+
     my $event_handler = $config {$profile_name}{event}{$event_name};
     my ($ext_name, @arg) = split (/\s/, $event_handler, 2);
 
