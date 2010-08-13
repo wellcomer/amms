@@ -64,6 +64,7 @@ else { # show specified stat
     unless ($type){
 
         @val = split (/\s/, $ammsc->exe ("get_anylimit", $profile, $ident));
+        print ("ERR Not found") && exit unless (@val);
         my @traf = split (/\s/, $ammsc->exe ("get_traf", $profile, $ident));
 
         @val2 = @val [0 .. 2];
