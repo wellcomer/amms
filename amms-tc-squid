@@ -58,7 +58,7 @@ if ($op =~ /^start$/i){
     load_config ();
 
     if ($mode =~ /tail/i){
-        my $ref = tie *LOG, "File::Tail", (name=>$squid_access_file, interval=>5, maxinterval=>10);
+        my $ref = tie *LOG, "File::Tail", (name=>$squid_access_file, interval=>5, maxinterval=>10, ignore_nonexistant=>1);
     }
     elsif ($mode =~ /batch/i){
         unless ($foreground){
