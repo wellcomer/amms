@@ -49,3 +49,6 @@ CREATE TABLE `lock` (
   `v1` varchar(255) NOT NULL default '',
   `v2` varchar(255) NOT NULL default ''
 ) TYPE=MyISAM;
+
+GRANT ALL PRIVILEGES ON amms_squid.* TO amms@localhost IDENTIFIED BY "amms";
+
