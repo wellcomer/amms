@@ -46,6 +46,10 @@ sub load_config {
     $config_file ||= "/etc/amms.conf";
     $profile ||= "default";
     %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
+
+    unless (exists $config {$profile}){
+        error ("Unknown profile name: $profile", 1);
+    }
     openlog ('hashd', $config {$profile}{hashd}{log}{options} || 'ndelay,pid', $config {$profile}{hashd}{log}{facility} || 'daemon');
 }
 
