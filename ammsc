@@ -122,6 +122,7 @@ sub limit {
         my @limit_sorted;
         
         foreach (@limit){
+            next unless $_; # skip empty limit
             @limit_val = split_res ($_);
             $limit_val [2] = '-' if ($limit_val [2] eq '');
             $limit_val [3] = '-' if ($limit_val [3] eq '');

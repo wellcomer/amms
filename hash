@@ -23,6 +23,7 @@ if ($cmd =~ /ls*/i){
     my $i=1;
 
     foreach (@list){
+        next unless $_; # skip empty records
         my ($key, $val) = split (/\s/);
         printf ("%-4d %-16s %s\n", $i, $key, $val);
         $i++;
