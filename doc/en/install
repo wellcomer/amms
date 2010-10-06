@@ -1,0 +1,46 @@
+ How to setup amms from git repository:
+
+ Navigate to the target installation directory (can be arbitrary), for example:
+
+ cd /home/user
+ git clone git://github.com/wellcomer/amms.git
+
+ create a symbolic link:
+
+ ln -s /home/user/amms /usr/lib/amms
+
+ Copy the configuration file conf to /etc/amms.conf
+ and edit it to fit your needs.
+
+ Create a database:
+
+ mysql < /usr/lib/amms/doc/db
+
+ Dependencies:
+
+ ammsc
+
+ perl -MCPAN -e "install HTTP:: Lite"
+
+ ammsd
+
+ FCGI::ProcManager
+ Config::General
+ Params::Validate
+ DBI
+ DBD::mysql
+
+ matchd
+
+ Net:: IP:: CMatch
+
+ amms-tc-squid
+
+ File:: Tail
+
+ Start sequence:
+
+ ammsd
+ matchd
+ hashd
+ amms-tc-squid
