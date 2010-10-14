@@ -22,7 +22,9 @@ CREATE TABLE `tlog` (
   `url` varchar(128) default NULL,
   `ident` varchar(24) default NULL,
   `mime` varchar(64) default NULL,
-  `hit` tinyint(1) default '0'
+  `hit` tinyint(1) default '0',
+  INDEX (`ident`),
+  INDEX (`ts`)
 ) TYPE=MyISAM;
 
 CREATE TABLE `tval` (
