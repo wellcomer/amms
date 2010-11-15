@@ -36,6 +36,15 @@
             traf = sh $amms_dir/traf -p squid -c $amms_dir/conf
         </extension>
 
+        <ammsrd>
+            ip_as_ident = 0
+            ammsd_uri = $ammsd_uri
+            hashd_uri = $hashd_uri
+            t_interr = http://localhost/interr.html
+            t_denybyip = http://localhost/deny_by_ip.html
+            t_overlim = http://localhost/overlim.html
+        </ammsrd>
+
         <matchd>
             socket = :9001
             queue = 128
@@ -43,7 +52,7 @@
             user = nobody
     	    <ignor>
                 check_domain_only = 1 # check uri for domain part only
-	    </ignor>
+            </ignor>
         </matchd>
 
         <hashd>

@@ -17,13 +17,33 @@
 
 use lib '/usr/lib/amms';
 use AMMS::Client;
+use Config::General;
+use Getopt::Long;
+
 use strict;
 
-my $server_uri = "http://localhost:81/ammsd.fcgi";
-my $hashd_uri = "http://localhost:81/hashd.fcgi";
+my $config_file;
+my $profile;
+my %config;
+
+GetOptions ("config|c=s" => \$config_file, "profile|p=s" => \$profile);
+
+sub load_config {
+
+    $config_file ||= "/etc/amms.conf";
+    $profile ||= "default";
+    %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
+
+    unless (exists $config {$profile}){
+        die "Unknown profile name: $profile";
+    }
+}
+
+my $ammsd_uri = $config{$profile}{ammsrd}{ammsd_uri};
+my $hashd_uri = $config{$profile}{ammsrd}{hashd_uri};
 
 my $ammsc = AMMS::Client->new;
-unless ($ammsc->connect ($server_uri)){
+unless ($ammsc->connect ($ammsd_uri)){
     undef $ammsc;
 }
 
@@ -31,6 +51,8 @@ my $hashd = AMMS::Client->new;
 unless ($hashd->connect ($hashd_uri)){
     undef $hashd;
 }
+
+undef $hashd if $config{$profile}{ammsrd}{ip_as_ident};
 
 $|=1;
 
@@ -40,21 +62,23 @@ my ($ident, $ip, $res);
 while (<>) {
 
     unless (defined $ammsc){
-        print "http://localhost/interr.html\n";
+        print $config{$profile}{ammsrd}{t_interr} . "\n";
         next;
     }
 
     my @f = split (/\s/);
 
     $ip = substr ($f [1], 0, -2);
+
     $ident = $f [2];
+    $ident = $ip if ($config{$profile}{ammsrd}{ip_as_ident});
     
     if ($hashd){
 
         $res = $hashd->exe ("check2", "squid", "lock", $ident, $ip);
 
         if ($res !~ /OK/i){
-            print "http://localhost/deny_by_ip.html\n";
+            print $config{$profile}{ammsrd}{t_denybyip} . "\n";
             next;
         }
     }
@@ -67,7 +91,7 @@ while (<>) {
     }
 
     if ($ammsc->{err_desc} =~ /sys/){
-        print "http://localhost/overlim.html\n";
+        print $config{$profile}{ammsrd}{t_overlim} . "\n";
         next;
     }
 
