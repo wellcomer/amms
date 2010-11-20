@@ -41,6 +41,7 @@
             ammsd_uri = $ammsd_uri
             hashd_uri = $hashd_uri
             t_interr = http://localhost/interr.html
+            t_deny = http://localhost/deny.html
             t_denybyip = http://localhost/deny_by_ip.html
             t_overlim = http://localhost/overlim.html
         </ammsrd>

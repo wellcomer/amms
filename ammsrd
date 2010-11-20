@@ -39,6 +39,8 @@ sub load_config {
     }
 }
 
+load_config ();
+
 my $ammsd_uri = $config{$profile}{ammsrd}{ammsd_uri};
 my $hashd_uri = $config{$profile}{ammsrd}{hashd_uri};
 
@@ -95,6 +97,6 @@ while (<>) {
         next;
     }
 
-    print "http://localhost/deny.html\n";
+    print $config{$profile}{ammsrd}{t_deny} . "\n";
 }
 
