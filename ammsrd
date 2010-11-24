@@ -37,6 +37,9 @@ sub load_config {
     unless (exists $config {$profile}){
         die "Unknown profile name: $profile";
     }
+    unless (exists $config {$profile}{ammsrd}){
+        die "No ammsrd section in $profile profile";
+    }
 }
 
 load_config ();
