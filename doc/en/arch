@@ -1,0 +1,85 @@
+AMMS (Account management for Squid)
+
+An account management for Squid. Works as a web service.
+Features
+
+    * Does not require php.
+    * Do not change SQUID config file by changing the parameters of access.
+    * No need to restart the SQUID when changing account preferences.
+    * Command line interface.
+    * Event-driven (in excess of the limit, off limits, etc.).
+    * Extensions (statistics, reports, import user accounts) can be written in any programming language.
+    * Distributed Network Architecture (slight scaling and fault tolerance).
+    * Simple protocol (control can be carried out through improvised means wget / curl, etc.)
+
+Configuration file
+
+The format and the possibilities are described in:
+http://search.cpan.org/~tlinden/Config-General-2.48/General.pm
+
+AMMSD
+
+FCGI process provides account management. To store information ammsd uses the MySQL database via DBI.
+
+Private database consists of the following tables:
+
+    * Lim – Limits
+    * Traf – traffic counters (normal, cached)
+    * Tlog – Journal of Traffic
+    * Tval – intermediate values of traffic
+
+Depending on the extensions, the database may contain additional tables.
+Unknown commands ammsd transferred to subsidiary programs registered in
+the configuration file.
+
+Limits:
+
+Limits are three types:
+
+    * Temporary (T)
+    * Normal (I)
+    * Parent (P).
+
+The main priority has a time limit, then normal and parent.
+If the limit does not have any settings that he borrows from its parent.
+
+Options limit:
+
+    * Name
+    * Parent
+    * Traffic volume (B, KB, MB, GB)
+    * Time period (s, m, h, d) (second, minute, hour, day)
+    * Status (status) (0 – off, 1 – enabled, 2 – blocked)
+    * Description
+
+Time period is calculated depending on the type of timer is specified in the configuration
+file (abs – absolute timer, rel – relative). When rel timer interval is calculated
+from time to time change the limit, with abs – from the frontier time period.
+
+Profile
+
+Profile is a set of extensions, events, and other configuration parameters that
+works AMMS.
+
+Extensions
+
+Extensions are specified in section extension of configuration file. They can be written in any
+programming language. Extensions can be of two types: sh – runs as an external program,
+arguments are passed to the command line, reads stdout, stderr; ammsc – parameters are passed
+to FCGI script in URL-encoded form, read HTTP response. Extensions provide the necessary additional
+functionality (import limits, viewing statistics, report generation etc.)
+
+Events
+
+An event handler registers in the section event.
+Events are generated and processed ammsd extensions. Example: check_access.disabled_by_sys
+is called when the user turns off the system limit is exceeded traffic.
+
+AMMSC client
+
+AMMS client implements the GET request over HTTP, provides syntax control limits and extensions AMMSD. If necessary, the client can support encryption, authentication, etc. depending on the type of server. The distribution of requests, authorization, and other advanced features implements high-performance http server (nginx or lighttpd).
+
+Integration with SQUID
+
+The amms-tc-squid used for parse access file and update traffic counters in the database.
+Access to Internet resources is controlled by the redirector ammsrd. It checks overlimit and other user account settings.

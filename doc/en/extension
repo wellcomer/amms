@@ -1,0 +1,62 @@
+squid profile:
+
+Module parameters:
+
+    -p - Profile
+    -t - name of the database table
+    -u - uri
+    -c - config file
+
+Ignored for calculating addresses.
+
+    ignore -p profile -t table -u matchd_uri [ls | rem | add] [num | rec]
+
+    ls - show
+    rem num - delete the entry with number num
+    add rec - add rec entry
+
+Import limits to the database
+
+    import -p profile -c config_file filename
+
+    filename - the file name to import
+
+    To export limits, use the command
+    ammsc li > filename
+
+The volume of used traffic
+
+    stat uri ident
+
+    uri - ammsd uri
+    ident - the user ID if no displays statistics for all users
+
+History (journal) of sites visited
+
+    history -p profile -c config_file ident time count
+
+    ident - the user ID
+    time - time (regexp), unless otherwise indicated showing the last 25 entries
+    count - the number of output records
+
+The list of extensions
+
+    ext -u ammsd_uri
+
+The volume of user traffic for the time period
+
+    traf -p profile -c config_file ident time [detail]
+
+    ident - the user ID (. - statistics for all users)
+    time - time (regexp)
+    detail - detail
+
+Binding login to the IP address
+
+    lock -p profile -t table -u hashd_uri [ls | set ident ip | rem num | get ident | check ident ip | help]
+
+    ident - the user ID
+    ip - IP address
+    num - delete the record with the number num
+
+

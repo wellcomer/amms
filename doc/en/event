@@ -1,0 +1,20 @@
+Event format:
+
+event_name arguments
+
+AMMSD events:
+
+Grant access:
+
+check_access.enable type ident
+
+    type (T|I|P)
+    ident limit identificator
+
+Deny access:
+
+check_access.disable type ident
+
+    type (T|I|P)
+    ident limit identificator
+
