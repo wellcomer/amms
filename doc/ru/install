@@ -1,5 +1,5 @@
 
- Рекомендуемая установка стабильной версии amms:
+ Установка AMMS из GIT:
 
  Перейдите в целевой каталог установки (может быть произвольным), к примеру:
 
@@ -16,6 +16,36 @@
  Создайте БД:
 
  mysql < /usr/lib/amms/doc/db
+
+ Интеграция со SQUID:
+
+ url_rewrite_program /usr/lib/amms/ammsrd -p squid
+
+ Интеграция с WEB сервером:
+
+ nginx:
+
+ location /ammsd.fcgi {
+	fastcgi_pass   127.0.0.1:9000;
+	include fastcgi_params;
+ }
+
+ location /matchd.fcgi {
+ 	fastcgi_pass   127.0.0.1:9001;
+	include fastcgi_params;
+ }
+
+ location /hashd.fcgi {
+	fastcgi_pass   127.0.0.1:9002;
+	include fastcgi_params;
+ }
+
+ Порядок запуска:
+
+ ammsd
+ matchd
+ hashd
+ amms-tc-squid 
 
  Зависимости:
 
@@ -38,10 +68,4 @@
  amms-tc-squid
 
  File::Tail
-
- Порядок запуска:
-
- ammsd
- matchd
- amms-tc-squid 
 

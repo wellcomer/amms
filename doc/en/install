@@ -5,7 +5,7 @@
  cd /home/user
  git clone git://github.com/wellcomer/amms.git
 
- create a symbolic link:
+ create a symlink:
 
  ln -s /home/user/amms /usr/lib/amms
 
@@ -15,6 +15,37 @@
  Create a database:
 
  mysql < /usr/lib/amms/doc/db
+
+ Integration with SQUID:
+
+ url_rewrite_program /usr/lib/amms/ammsrd -p squid
+
+ Integration with web server:
+
+ nginx:
+
+ location /ammsd.fcgi {
+	fastcgi_pass   127.0.0.1:9000;
+	include fastcgi_params;
+ }
+
+ location /matchd.fcgi {
+ 	fastcgi_pass   127.0.0.1:9001;
+	include fastcgi_params;
+ }
+
+ location /hashd.fcgi {
+	fastcgi_pass   127.0.0.1:9002;
+	include fastcgi_params;
+ }
+
+
+ Start sequence:
+
+ ammsd
+ matchd
+ hashd
+ amms-tc-squid
 
  Dependencies:
 
@@ -38,9 +69,4 @@
 
  File:: Tail
 
- Start sequence:
 
- ammsd
- matchd
- hashd
- amms-tc-squid

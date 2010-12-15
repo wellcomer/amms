@@ -14,9 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# ammsc command line format
-# ammsc -p <profile> -c "<action> <ident> [params]"
-
 use strict;
 no  strict 'refs';
 use Getopt::Long;
@@ -73,7 +70,7 @@ else { # run extension
     }
 }
 
-sub cword {
+sub cword { # complete word
 
     my ($word_list, $word_part) = @_;
 

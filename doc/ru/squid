@@ -1,8 +1,0 @@
-acl auth_users proxy_auth REQUIRED
-acl bypass url_regex "/etc/squid/bypass"
-
-http_access allow auth_users
-
-url_rewrite_program /usr/local/bin/ammsrd -p squid
-url_rewrite_access deny bypass
-
