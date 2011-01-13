@@ -3,7 +3,6 @@ AMMS (Account management for Squid)
 An account management for Squid. Works as a web service.
 Features
 
-    * Does not require php.
     * Do not change SQUID config file by changing the parameters of access.
     * No need to restart the SQUID when changing account preferences.
     * Command line interface.
