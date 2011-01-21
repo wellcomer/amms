@@ -32,12 +32,21 @@ load_config ();
 my $dbh = DBI->connect ($config {$profile}{db}{dsn}, $config {$profile}{db}{user}, $config{$profile}{db}{pass},
                        {RaiseError => 1, PrintError => 1, AutoCommit => 1});
 
-my ($ident, $date, $count) = @ARGV;
+my ($ident, $date, $flag) = @ARGV;
+
+if ($flag =~ /cl*e*a*r*/i){
+    my $rows_removed = $dbh->do ("delete from tlog where ident=? and ts REGEXP ?", undef, $ident, $date) or die $dbh->errstr;
+    exit if $rows_removed eq "0E0";
+    if ($rows_removed){
+        print "OK $rows_removed rows removed";
+    }
+    exit;
+}
 
 $date ||= '.';
-$count ||= 25;
+$flag ||= 25;
 
-my $rec = $dbh->selectall_arrayref ("select * from tlog where ident=? and ts REGEXP ? order by ts desc limit ?", undef, $ident, $date, $count);
+my $rec = $dbh->selectall_arrayref ("select * from tlog where ident=? and ts REGEXP ? order by ts desc limit ?", undef, $ident, $date, $flag);
 my @val;
 
 for (@$rec){
