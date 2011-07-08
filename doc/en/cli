@@ -12,43 +12,44 @@
 
  Limits:
 
- ammsс limit [ident] [80M |no|state|desc|parent|rename|over] [1d|no] [temp|ident|parent]
+ limit [ident] [100M |no|state|desc|parent|rename|over] [1d|no] [temp|ident|parent]
 
  Set user limit:
  
-    ammsc li user1 100M 1d
+    li user1 100M 1d
 
     Default limit type is ident.
 
  Set description
 
-    ammsc li user1 desc SuperUser
+    li user1 desc SuperUser
 
  Remove description:
 
-    ammsc li user1 desc no
+    li user1 desc no
 
  Set status (on, off, disabled)
 
-    ammsc li user1 s on|off|dis
+    li user1 s on|off|dis
 
  Set parent limit (inheritation):
 
-    ammsc li user1 parent users
+    li user1 parent users
 
  Rename user1 to user2:
 
-    ammsc li user1 ren user2
+    li user1 ren user2
 
  Set overlimit for 3 days:
 
-    ammsc li user1 over 3d
+    li user1 over 3d
 
  Force remove overlimit:
 
-    ammsc li user1 over no
+    li user1 over no
 
  Traffic:
 
- ammsс reset ident
+ reset ident
 
+ See extension for other commands

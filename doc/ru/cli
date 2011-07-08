@@ -13,44 +13,46 @@
 
  Лимиты:
 
- ammsс limit [ident] [80M |no|state|desc|parent|rename|over] [1d|no] [temp|ident|parent]
+ ammsс limit [ident] [100M |no|state|desc|parent|rename|over] [1d|no] [temp|ident|parent]
 
  Установить лимит пользователя user1, 100M на 24 часа с начала суток
  (таймер abs), с времени задания лимита (таймер rel)
  
-    ammsc li user1 100M 1d
+    li user1 100M 1d
 
     Если тип лимита не указан, подразумевается ident.
 
  Задать описание
 
-    ammsc li user1 desc SuperUser
+    li user1 desc SuperUser
 
  Удалить описание:
 
-    ammsc li user1 desc no
+    li user1 desc no
 
  Изменить статус (включен, выключен, заблокирован)
 
-    ammsc li user1 s on|off|dis
+    li user1 s on|off|dis
 
  Назначить родительский лимит (наследование недостающих параметров):
 
-    ammsc li user1 parent users
+    li user1 parent users
 
  Переименовать user1 в user2:
 
-    ammsc li user1 ren user2
+    li user1 ren user2
 
  Задать неограниченный лимит на опр. период:
 
-    ammsc li user1 over 3d
+    li user1 over 3d
 
  Удалить неограниченный лимит вручную:
 
-    ammsc li user1 over no
+    li user1 over no
 
  Трафик:
 
- ammsс reset ident
+ reset ident
+
+ Остальные команды реализуются расширениями (см. extension)
 

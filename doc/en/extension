@@ -33,11 +33,12 @@ The volume of used traffic
 
 History (journal) of sites visited
 
-    history -p profile -c config_file ident time count
+    history -p profile -c config_file ident time [count|clear]
 
     ident - the user ID
     time - time (regexp), unless otherwise indicated showing the last 25 entries
     count - the number of output records
+    clear - clear history
 
 The list of extensions
 

@@ -33,11 +33,12 @@
 
 История (журнал) посещаемых сайтов
 
-    history -p profile -c config_file ident time count
+    history -p profile -c config_file ident time [count|clear]
 
     ident - идентификатор пользователя
     time - время (regexp), если не указано выводится последние 25 записей
     count - количество выводимых записей
+    clear - удаление истории
 
 Список расширений
 
