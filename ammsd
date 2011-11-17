@@ -32,7 +32,7 @@ use IPC::SysV qw(IPC_CREAT SETVAL IPC_RMID);
 
 use lib '/usr/lib/amms/';
 
-my $VERSION = 0.1;
+my $VERSION = 0.9;
 my $DEBUG = 0;
 
 my %config;
@@ -47,7 +47,7 @@ my $validate_type_regex = qr/(T|I|P)/;
 my $validate_value_regex = qr/\d+\.*\d*(b|k|m|g|$)/i;
 my $validate_period_regex = qr/\d+(s|m|h|d)/i;
 
-my $IPC_KEY = 29072010;
+my $IPC_KEY = 29710;
 my $IPC_OPS_WAIT = pack ("s!3", 0, 0, 0);
 my $IPC_OPS_INC  = pack ("s!3", 0, 1, 0);
 my $IPC_OPS_DEC  = pack ("s!3", 0, -1, 0);
@@ -58,7 +58,7 @@ sub validation_err {
 
 sub load_config {
     
-    $config_file ||= '/etc/amms.conf';
+    $config_file ||= '/etc/amms/amms.conf';
 
     %config = ();    
     %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
@@ -99,6 +99,11 @@ elsif ($op =~ /^restart$/i){
     load_config ();
     run ($foreground);
 }
+elsif ($op =~ /^testconfig$/i){
+    load_config ();
+    print "OK\n";
+    exit;
+}
 elsif ($op =~ /^status$/i){
     status ();
     exit;
@@ -109,7 +114,7 @@ elsif ($op =~ /^version$/i){
 }
 else {
     print "ammsd $VERSION\n";
-    print "Usage: ammsd [--config|-c file] [--foreground|-f] start|stop|restart|version\n";
+    print "Usage: ammsd [--config|-c file] [--foreground|-f] start|stop|restart|testconfig|status|version\n";
     exit;
 }
 
@@ -184,12 +189,15 @@ sub run {
 
     # create sync instance
 
-    my $sem_id = semget ($IPC_KEY, 1, 0666 | IPC_CREAT ) || syslog ('notice', "Can't create semaphore $!");
+    my $sem_id = semget ($IPC_KEY, 1, 0666 | IPC_CREAT ); 
 
-    if ($sem_id){
-        syslog ('notice', "sem id $sem_id");
-        semctl ($sem_id, 0, SETVAL, 0);
+    unless (defined $sem_id){
+        syslog ('notice', "Can't create semaphore $!");
+        stop ();
     }
+
+    syslog ('notice', "sem id $sem_id");
+    semctl ($sem_id, 0, SETVAL, 0);
 }
 
 sub stop {

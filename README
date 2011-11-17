@@ -9,4 +9,4 @@ Features
     * Event-driven (in excess of the limit, off limits, etc.).
     * Extensions (statistics, reports, import user accounts) can be written in any programming language.
     * Distributed Network Architecture (slight scaling and fault tolerance).
-    * Simple protocol (control can be carried out through improvised means wget / curl, etc.)
+    * Simple text protocol (control can be carried out through improvised means wget / curl, etc.)

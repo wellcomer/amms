@@ -10,7 +10,7 @@
 
  ln -s /home/user/amms /usr/lib/amms
 
- Скопируйте конфигурационный файл conf в /etc/amms.conf
+ Скопируйте конфигурационный файл conf в /etc/amms/amms.conf
  и отредактируйте его под свои нужды.
 
  Создайте БД:

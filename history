@@ -12,7 +12,7 @@ my ($profile, $config_file);
 
 sub load_config {
     
-    $config_file ||= '/etc/amms.conf';
+    $config_file ||= '/etc/amms/amms.conf';
 
     %config = ();    
     %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);

@@ -43,8 +43,8 @@ GetOptions ("config|c=s" => \$config_file, "profile|p=s" => \$profile, "foregrou
 
 sub load_config {
 
-    $config_file ||= "/etc/amms.conf";
-    $profile ||= "default";
+    $config_file ||= "/etc/amms/amms.conf";
+    $profile ||= "squid";
     %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
 
     unless (exists $config {$profile}){

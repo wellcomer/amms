@@ -1,0 +1,158 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          amms
+# Required-Start:    $local_fs $remote_fs $network $syslog
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Should-Start:      $named $mysql $squid $nginx
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: starts the amms server
+# Description:       starts the amms server
+### END INIT INFO
+
+PATH=/usr/lib/amms
+NAME=amms
+DESC=amms
+
+set -e
+
+[ -x "$PATH/ammsd" ] || exit 0
+
+case "$1" in
+	start)
+		case "$2" in
+			ammsd)
+				echo -n "Starting $2: "
+				$PATH/ammsd start
+				;;
+			matchd)
+				echo -n "Starting $2: "
+				$PATH/matchd start
+				;;
+			hashd)
+				echo -n "Starting $2: "
+				$PATH/hashd start
+				;;
+			tc)
+				echo -n "Starting $2: "
+				$PATH/amms-tc-squid start
+				;;
+			*)
+				echo "Starting all amms daemons"
+				echo -n "ammsd: "
+                                $PATH/ammsd start
+				echo -n "matchd: "
+				$PATH/matchd start
+				echo -n "hashd: "
+				$PATH/hashd start
+				echo -n "tc: "
+				$PATH/amms-tc-squid start
+				;;
+		esac
+		;;
+
+	stop)
+		case "$2" in
+			ammsd)
+				echo -n "Stopping $2: "
+				$PATH/ammsd stop
+				;;
+			matchd)
+				echo -n "Stopping $2: "
+				$PATH/matchd stop
+				;;
+			hashd)
+				echo -n "Stopping $2: "
+				$PATH/hashd stop
+				;;
+			tc)
+				echo -n "Stopping $2: "
+				$PATH/amms-tc-squid stop
+				;;
+			*)
+				echo "Stopping all amms daemons"
+                                echo -n "tc: "
+				$PATH/amms-tc-squid stop
+                                echo -n "hashd: "
+				$PATH/hashd stop
+                                echo -n "matchd: "
+				$PATH/matchd stop
+                                echo -n "ammsd: "
+				$PATH/ammsd stop
+				;;
+		esac
+		;;
+
+	restart|force-reload)
+
+                $PATH/ammsd testconfig || exit $?
+
+		case "$2" in
+			ammsd)
+				echo -n "Restarting $2: "
+				$PATH/ammsd restart
+				;;
+			matchd)
+				echo -n "Restarting $2: "
+				$PATH/matchd restart
+				;;
+			hashd)
+				echo -n "Restarting $2: "
+				$PATH/hashd restart
+				;;
+			tc)
+				echo -n "Restarting $2: "
+				$PATH/amms-tc-squid restart
+				;;
+			*)
+				echo "Restarting all amms daemons"
+                                echo -n "ammsd: "
+				$PATH/ammsd restart
+                                echo -n "matchd: "
+				$PATH/matchd restart
+                                echo -n "hashd: "
+				$PATH/hashd restart
+                                echo -n "tc: "
+				$PATH/amms-tc-squid restart
+				;;
+		esac
+		;;
+
+	status)
+		case "$2" in
+			ammsd)
+				echo -n "$2 status: "
+				$PATH/ammsd status
+				;;
+			matchd)
+				echo -n "$2 status: "
+				$PATH/matchd status
+				;;
+			hashd)
+				echo -n "$2 status: "
+				$PATH/hashd status
+				;;
+			tc)
+				echo -n "$2 status: "
+				$PATH/amms-tc-squid status
+				;;
+			*)
+				echo -n "ammsd: "
+				$PATH/ammsd status
+				echo -n "matchd: "
+				$PATH/matchd status
+				echo -n "hashd: "
+				$PATH/hashd status
+				echo -n "amms-tc-squid: "
+				$PATH/amms-tc-squid status
+				;;
+		esac
+		;;
+	*)
+		echo "Usage: $NAME {start|stop|restart|force-reload|status}" >&2
+		exit 1
+		;;
+esac
+
+exit 0

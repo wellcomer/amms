@@ -9,7 +9,7 @@
 
  ln -s /home/user/amms /usr/lib/amms
 
- Copy the configuration file conf to /etc/amms.conf
+ Copy the configuration file conf to /etc/amms/amms.conf
  and edit it to fit your needs.
 
  Create a database:

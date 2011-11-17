@@ -1,0 +1,140 @@
+.\"Created with GNOME Manpages Editor Wizard
+.\"http://sourceforge.net/projects/gmanedit2
+.TH ammsc 1 "October 25, 2011" "0.9" "An account management system for SQUID"
+
+.SH NAME
+ammsc \- amms console client
+
+.SH SYNOPSIS
+.B ammsc
+.RI command
+arguments
+.br
+
+.SH DESCRIPTION
+AMMS client implements GET requests by HTTP protocol for limit and extensions management.
+The distribution of request, authentication and other additional possibilities provides a high performance http server.
+The command is extension name or ammsc built-in command.
+The syntax supports abbreviation of commands and arguments if no conflicts with other names.
+
+.SH Built-in commands
+.B limit
+[ident] [V|no|state|desc|parent|rename|over] [P|no] [t|i|p]
+.RS
+
+ident - user identificator, V - traffic amount (B,KB,MB,GB), P - period (s/m/h/d - sec/min/hour/day)
+
+Set user limit for user1, 100M to 24 hr from day begin (timer is abs), from the time of limit setting (the timer is rel)
+
+	ammsc li user1 100M 1d
+
+Default limit type is ident.
+
+Remove limit:
+
+	ammsc li user1 no
+
+Set description:
+
+	ammsc li user1 desc SuperUser
+
+Remove description:
+
+	ammsc li user1 desc no
+
+Change status (on, off, disabled):
+
+	ammsc li user1 s on|off|dis
+
+Set parent limit (parameters inheritance):
+
+	ammsc li user1 parent users
+
+Rename user1 to user2:
+
+	ammsc li user1 ren user2
+
+Set overlimit for specified period, example 3 days:
+
+	ammsc li user1 over 3d
+
+Remove overlimit by hand:
+
+	ammsc li user1 over no
+.RE
+
+.B reset
+ident
+.RS
+Reset traffic
+.RE
+
+.SH EXTENSIONS
+.B ext
+.RS
+Extensions list
+.RE
+
+.B history
+ident [time] [count]
+
+.RS
+ History of visited sites
+ ident - user id
+ time - time, default is last 25 records
+ count - output records count
+
+ Time format (time): YYYY-MM, YYYY-MM-DD
+.RE
+
+.B ignore
+[ls|rem|add] [num|rec]
+
+.RS
+ Ignored for counting addresses
+ ls - view
+ rem num - Remove record with number num
+ add rec - add record rec (symbol name example ya.ru, 
+ network address example 192.168.0.0/16 or host address)
+.RE
+
+
+.B import
+filename
+
+.RS
+ Import limits into DB
+ For export use: ammsc li > filename
+.RE
+
+.B lock
+[ls|set ident ip|rem num|get ident|check ident ip]
+
+.RS
+ Lock login to the specified IP, logins from other IPs disabled.
+ ls - view
+ set - link ident to ip
+ rem num - remove record with number num
+ get ident - get records for ident
+ check ident ip - check access by ident and ip
+.RE
+
+.B stat
+ident
+
+.RS
+ The volume of traffic used for the period of the limit
+ ident - user id, default - all users
+.RE
+
+.B traf
+ident time [detail]
+
+.RS
+ The volume of traffic used for specified period
+ ident - user id, default - all users
+ detail - detail information about traffic per site
+.RE
+
+.SH "SEE ALSO"
+

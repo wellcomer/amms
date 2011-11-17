@@ -16,6 +16,7 @@
 
 use strict;
 no  strict 'refs';
+use lib '/usr/lib/amms';
 use Getopt::Long;
 use POSIX qw(strftime);
 use AMMS::Client;

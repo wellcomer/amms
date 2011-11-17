@@ -1,0 +1,5 @@
+#!/bin/sh
+#
+# Copy it to your $PATH and rename to ammsc
+
+/usr/lib/amms/ammsc -u http://localhost:81/ammsd.fcgi -p squid -e "$1 $2 $3 $4 $5"

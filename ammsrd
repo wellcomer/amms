@@ -30,7 +30,7 @@ GetOptions ("config|c=s" => \$config_file, "profile|p=s" => \$profile);
 
 sub load_config {
 
-    $config_file ||= "/etc/amms.conf";
+    $config_file ||= "/etc/amms/amms.conf";
     $profile ||= "default";
     %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
 
