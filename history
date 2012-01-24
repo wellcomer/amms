@@ -44,6 +44,13 @@ if ($flag =~ /cl*e*a*r*/i){
 }
 
 $date ||= '.';
+
+if ($date =~ /to*d*a*y*/i){
+
+    my @tm = localtime (time);
+    $date = sprintf ("%04d-%02d-%02d", $tm[5]+1900, $tm[4]+1, $tm[3]);
+}
+
 $flag ||= 25;
 
 my $rec = $dbh->selectall_arrayref ("select * from tlog where ident=? and ts REGEXP ? order by ts desc limit ?", undef, $ident, $date, $flag);
