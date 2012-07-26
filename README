@@ -7,6 +7,6 @@ Features
     * No need to restart the SQUID when changing account preferences.
     * Command line interface.
     * Event-driven (in excess of the limit, off limits, etc.).
-    * Extensions (statistics, reports, import user accounts) can be written in any programming language.
+    * Extensions can be written in any programming language.
     * Distributed Network Architecture (slight scaling and fault tolerance).
     * No SQL.
