@@ -8,13 +8,13 @@
 
 check_access.enable type ident
 
-    type (T|I|P)
+    type (T|I)
     ident идентификатор лимита
 
 Отключение доступа:
 
 check_access.disable type ident
 
-    type (T|I|P)
+    type (T|I)
     ident идентификатор лимита
 

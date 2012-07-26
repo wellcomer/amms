@@ -2,186 +2,87 @@
 
 use strict;
 
-use DBI;
-use Config::General;
-use Getopt::Long;
+use lib "/usr/lib/amms/";
+use AMMS::Lib qw(:all);
+use AMMS::Client;
+use File::Which;
 
-my %config;
-my ($profile, $config_file);
+my ($uri, $ident, $date) = @ARGV;
 
-sub load_config {
-    
-    $config_file ||= '/etc/amms/amms.conf';
+die "No uri" unless $uri;
+die "No ident" unless $ident;
 
-    %config = ();    
-    %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
-    
-    my $keys_count = scalar keys (%config);
-    
-    unless ($keys_count){
-        die "Bad configuration in $config_file";
-    }
+$date ||= "today";
 
-    return $keys_count;
+my $file = locate (".amms", "tval");
+$date = fdate ($date);
+$date =~ s/"//g;
+
+my $grep = which ("grep");
+my $search = "\"$date $ident\"";
+
+my $text = `$grep $search $file`;
+my @line = split ("\n", $text);
+
+my (%size, %desc, $stub, $id, $v1, $v2);
+
+# values from tval
+
+for (@line){
+    my ($stub, $stub, $id, $v1, $v2) = split;
+    $size {$id}[0] += $v1;
+    $size {$id}[1] += $v2;
 }
 
-GetOptions ("profile|p=s" => \$profile, "config|c=s" => \$config_file);
-load_config ();
+my $ammsc = AMMS::Client->new;
 
-my $dbh = DBI->connect ($config {$profile}{db}{dsn}, $config {$profile}{db}{user}, $config{$profile}{db}{pass},
-                       {RaiseError => 1, PrintError => 1, AutoCommit => 1});
-
-my ($ident, $date, $detail) = @ARGV;
-my @val;
-
-if ($date =~ /to*d*a*y*/i){
-
-    my @tm = localtime (time);
-    $date = sprintf ("%04d-%02d-%02d", $tm[5]+1900, $tm[4]+1, $tm[3]);
+unless ($ammsc->connect ($uri)){
+    die "Can't connect to amms daemon";
 }
 
-if ($detail){ # detailed traffic ordered by value
-    traf_details ($ident, $date);
-    exit;
-}
+my $limit = xb $ammsc->exe ("get_limit");
+my $traf = xb $ammsc->exe ("get_traf");
 
-unless (traf_tval ($ident, $date)){ # if no fast result from tval
-        traf_tlog ($ident, $date);  # get it slow from tlog
-}
+my $ts;
+my @type = qw(T I);
 
-sub traf_tval { # fast
+# values from ammsd traf
 
-    my ($ident, $date) = @_;
+for my $type (@type){
 
-    if ($ident eq '.'){ # all
-
-        # t0 = traf with timestamps        
-        $dbh->do ("create temporary table t0 select ident,size,size_hit,ts from traf cross join lim using(ident)");
-        # t0 = traf with ts = date
-        $dbh->do ("delete from t0 where ts not regexp ?", undef, $date);
-        # t0 = traf + tval ts=date
-        $dbh->do ("insert into t0 select * from tval where ts regexp ?", undef, $date);
-        # t1 = t0 with sum. values
-        $dbh->do ("create temporary table t1 select ident,sum(size),sum(size_hit) from t0 group by ident");
-        # t1 + desc
-        $ident = $dbh->selectall_arrayref ("select ident,`sum(size)`,`sum(size_hit)`,`desc` from t1 cross join lim using(ident) order by ident");
-
-        return undef unless (@$ident);
-
-        for (@$ident){
-
-            my ($name, $size, $size_hit, $desc) = @$_;
-            printf ("%-16s %7s %7s %12s %12s %s\n", $name, kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit, $desc);
-        }
-
-        my ($size, $size_hit) = $dbh->selectrow_array ("select sum(size), sum(size_hit) from t0");
-
-        printf ("\n%-16s %7s %7s %12s %12s\n", "Total",  kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit);
-    }
-    else {
-
-        $dbh->do ("create temporary table t0 select ident,size,size_hit,ts from traf cross join lim using(ident) where ident=?", undef, $ident);
-        $dbh->do ("delete from t0 where ts not regexp ?", undef, $date);
-        $dbh->do ("insert into t0 select * from tval where ts regexp ? and ident=?", undef, $date, $ident);
-        $dbh->do ("create temporary table t1 select ident,sum(size),sum(size_hit) from t0 group by ident");
-        my @ident = $dbh->selectrow_array ("select ident,`sum(size)`,`sum(size_hit)`,`desc` from t1 cross join lim using(ident)");
-
-        return undef unless (@ident);
-
-        my ($name, $size, $size_hit, $desc) = @ident;
-        printf ("%s %s %s %s %s %s\n", $name, kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit, $desc);
+    for $id (keys %{$limit->{$type}}){
+        $desc {$id} = $limit->{$type}{$id}{desc};
+        next unless (grep (/$ident/, ($id)));
+        $ts = ts ($limit->{$type}{$id}{ts});
+        next unless (grep (/$date/, $ts));
+        $size {$id}[0] += $traf->{$id}[0];
+        $size {$id}[1] += $traf->{$id}[1];
+        $traf->{$id} = [0,0];
     }
 }
 
-sub traf_tlog { # slow accurate
-
-    my ($ident, $date) = @_;
-
-    $dbh->do ("drop table t0");
-
-    if ($ident eq '.') { # all
-
-        $dbh->do ("create temporary table t0 (index (ident)) select ident,size from tlog where ts regexp ?
-                   and (method='GET' or method='CONNECT')", undef, $date);
-
-        my $ident = $dbh->selectcol_arrayref ("select distinct ident from t0");
-
-        my @size;
-        my $desc;
-
-        for (@$ident){
-
-            @size = ();
-            $desc = '';
-
-            $desc = $dbh->selectrow_array ("select `desc` from lim where ident=?", undef, $_);
-
-            $size [2] = $dbh->selectrow_array ("select sum(size) from t0 where ident=? and hit=0", undef, $_) || '0'; 
-            $size [3] = $dbh->selectrow_array ("select sum(size) from t0 where ident=? and hit=1", undef, $_) || '0'; # cached
-
-            $size [0] = kmg ($size [2]) || '0';
-            $size [1] = kmg ($size [3]) || '0';
-
-            printf ("%-16s %7s %7s %12s %12s %s\n", $_, @size, $desc);
-        }
-
-        $size [2] = $dbh->selectrow_array ("select sum(size) from t0 where hit=0") || '0';
-        $size [3] = $dbh->selectrow_array ("select sum(size) from t0 where hit=1") || '0';
-
-        $size [0] = kmg ($size [2]) || '0';
-        $size [1] = kmg ($size [3]) || '0';
-
-        printf ("\n%-16s %7s %7s %12s %12s\n", "Total", @size);
-    }
-    else {
-
-        $dbh->do ("create temporary table t0 select * from tlog where ident=? and ts REGEXP ? and (method='GET' or method='CONNECT')",
-                   undef, $ident, $date);
-
-        my $size = $dbh->selectrow_array ("select sum(size) from t0 where hit=0");
-        my $size_hit = $dbh->selectrow_array ("select sum(size) from t0 where hit=1");
-        my $desc = $dbh->selectrow_array ("select `desc` from lim where ident=?", undef, $ident);
-
-        printf ("%s %s %s %s %s %s\n", $ident, kmg($size) || 0, kmg($size_hit) || 0, $size, $size_hit, $desc);
-    }
+if ((keys %size) == 0){
+    die "Not found";
 }
 
-sub traf_details {
+$v1 = $v2 = 0; # size, size_hit
 
-    my ($ident, $date) = @_;
+my $format = "%s %s %s %s %s %s\n";
+my $print_total;
 
-    my $rec = $dbh->selectall_arrayref ("select url,size from tlog where ident=? 
-                                         and ts REGEXP ? 
-                                         and (method='GET' or method='CONNECT') 
-                                         and hit=0 order by size desc", undef, $ident, $date);
-    for (@$rec){
-        @val = @{$_};
-        $val [1] = kmg ($val [1]);
-        printf ("%6s %s\n", $val [1], $val [0]);
-    }
+if ((keys %size) > 1){
+    $format = "%-16s %7s %7s %12s %12s %s\n";
+    $print_total = 1;
 }
 
-sub kmg { # human readable values
-    
-    my $bytes = shift;
-    my $value = $bytes;
-            
-    my $g = 1073741824;
-    my $m = 1048576;
-    my $k = 1024;
-                        
-    if ($bytes >= $g){
-        $value = sprintf ('%.2f%s', $bytes / $g, 'G');
-    }
-    elsif ($bytes >= $m){
-        $value = sprintf ('%.1f%s', $bytes / $m, 'M');
-    }
-    elsif ($bytes >= $k){
-        $value = sprintf ('%.1f%s', $bytes / $k, 'K');
-    }
-    
-    $value =~ s/\.0+\s/ /g;
-    
-    return $value;
+my @ids = sort keys %size;
+
+for $id (@ids){
+    $v1 += $size{$id}[0];
+    $v2 += $size{$id}[1];
+    printf $format, $id, kmg ($size{$id}[0]) || 0, kmg ($size{$id}[1]) || 0, $size{$id}[0], $size{$id}[1], $desc{$id};
 }
 
+if ($print_total){
+    printf "\n%-16s %7s %7s %12s %12s\n", "Total",  kmg ($v1) || 0, kmg ($v2) || 0, $v1, $v2;
+}

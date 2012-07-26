@@ -1,59 +1,69 @@
 #!/usr/bin/perl
-# Client for hash daemon
-# (C) 2010
+
+# Client for hashd daemon (C) 2012
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+        
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+                
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use strict;
+use feature qw(say);
+
+use utf8;
+use open qw(:std :utf8);
+
 use lib "/usr/lib/amms";
+use AMMS::Lib qw(xs xb);
 use AMMS::Client;
 use Getopt::Long;
 
-my ($table, $uri, $profile);
+my ($uri, $res, $pre);
 
-GetOptions ("table|t=s" => \$table, "uri|u=s" => \$uri, "p|profile=s" => \$profile);
+GetOptions ("uri|u=s" => \$uri, "prefix|p=s" => \$pre);
 
-my $cmd = $ARGV [0] || 'ls';
+my ($do, $key, $val) = @ARGV;
 
-my $hash = AMMS::Client->new;
-   $hash->connect ($uri) || die "Can't connect to hashd URI: $uri";
+$do ||= 'ls';
 
-my @list = $hash->exe ("get_all", $profile, $table);
+my $hashd = AMMS::Client->new;
+   $hashd->connect ($uri) || die "Can't connect to hashd URI: $uri";
 
-if ($cmd =~ /ls*/i){
-
-    my $i=1;
-
-    foreach (@list){
-        next unless $_; # skip empty records
-        my ($key, $val) = split (/\s/);
-        printf ("%-4d %-16s %s\n", $i, $key, $val);
-        $i++;
-    }
-}
-elsif ($cmd =~ /se*t*/){
-    print "OK\n" if $hash->exe ("set", $profile, $table, $ARGV [1], $ARGV [2]);
-}
-elsif ($cmd =~ /re*m*/){
+if ($do =~ /ls*/i){
     
-    my $num = $ARGV [1];
+    $res = $hashd->exe ("get_all");
+    die "ERR undef response" unless $res;
 
-    if ($ARGV [1] > @list || $ARGV [1] < 1){
-        print  "ERR Bad index\n";
-        exit;
+    my $body = xb $res;
+
+    while (my ($key, $val) = each %$body){
+        if ($pre){
+            next if ($key !~ /^$pre/);
+            $key =~ s/$pre//;
+        }
+        printf ("%-16s %s\n", $key, $val);
     }
-
-    $ARGV[1]--;
-
-    my $keyval = $list [$ARGV [1]];
-    my ($key, $val) = split (/\s/, $keyval);
-
-    print "OK\n" if $hash->exe ("rem", $profile, $table, $key, $val);
 }
-elsif ($cmd =~ /ch*e*c*k*/){
-    print $hash->exe ("check", $profile, $table, $ARGV [1], $ARGV [2]);
+elsif ($do =~ /se*t*/){
+    say xs $hashd->exe ("set", {key=>"$pre$key", val=>$val});
 }
-elsif ($cmd =~ /ge*t*/){
-    print $hash->exe ("get", $profile, $table, $ARGV [1]);
+elsif ($do =~ /re*m*/){
+    say xs $hashd->exe ("rem", {key=>"$pre$key"});
+}
+elsif ($do =~ /ch*e*c*k*/){
+    say xs $hashd->exe ("check", {key=>"$pre$key", val=>$val});
+}
+elsif ($do =~ /ge*t*/){
+    say xb $hashd->exe ("get", {key=>"$pre$key"});
 }
 else { # print help
-    print "Options: --table|-t table --uri|-u uri --profile|-p profile (ls|set key val|rem num|check key val)\n";
+    say "Options: --uri|-u uri [--prefix|-p prefix] (ls|set key val|rem key|check key val)";
 }

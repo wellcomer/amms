@@ -1,0 +1,110 @@
+#!/usr/bin/perl
+
+# AMMS traffic counter for SQUID
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+        
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+                
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+
+use lib "/usr/lib/amms/";
+use AMMS::Lib qw (:all);
+use AMMS::Client;
+use Daemon::Generic;
+use File::Tail;
+
+our $VERSION = "0.2";
+our $NAME = "ammstc";
+
+my ($conf, $mode);
+
+$mode ||= "tail";
+
+newdaemon (
+    pidfile  => locate_pid ("$NAME.pid"),
+    progname => $NAME
+);
+
+sub gd_flags_more {
+    return ("-m" => "Mode: tail | batch | stdin (default is tail)");
+}
+
+sub gd_more_opt {
+    return ("mode|m=s" => \$mode);
+}
+
+sub gd_preconfig {
+
+    my ($self) = @_;
+    
+    $conf = conf ($self->{configfile});
+    return ();
+}
+                                
+sub gd_run {
+
+    my ($self) = @_;
+
+    $0 = $NAME;
+    
+    runas ($conf->{$NAME}{user});
+
+    if ($mode =~ /tail/i){
+        my $ref = tie *LOG, "File::Tail", (name=>$conf->{$NAME}{access_file}, interval=>5, maxinterval=>10, ignore_nonexistant=>1);
+    }
+    elsif ($mode =~ /batch/i){
+        unless ($self->{gd_foreground}){
+            die "Run this in foreground mode (-f)";
+        }
+        unless (open (LOG, "<$conf->{$NAME}{access_file}")){
+            die "Can't open $conf->{$NAME}{access_file} in batch mode ($!)";
+        }
+    }
+    elsif ($mode =~ /stdin/i){
+        unless ($self->{gd_foreground}){
+            die "Run this in foreground mode (-f)";
+        }
+        *LOG = *STDIN;
+    }
+
+    my ($ts,$ip,$rcode,$size,$method,$uri,$ident,$mime);
+
+    my @field;
+    my $res;
+    
+    my $ammsc = AMMS::Client->new;
+
+    my $conn_try = 0;
+
+    while (! defined $ammsc->connect ($conf->{$NAME}{ammsd_uri})){
+	$conn_try++;
+        die "Can't connect to amms daemon" if ($conn_try >= 4);
+	sleep 5;
+    }
+
+    while (<LOG>){
+
+        @field = split (/\s+/);
+        ($ts,$ip,$rcode,$size,$method,$uri,$ident,$mime) = @field [0,2,3,4,5,6,7,9];
+
+        $res = $ammsc->exe ("add_uri", {ts=>$ts, ip=>$ip, rcode=>$rcode, size=>$size,
+                             method=>$method, uri=>$uri, ident=>$ident, mime=>$mime});
+
+        next if (defined $res);
+
+        while (! defined $ammsc->connect ($conf->{$NAME}{ammsd_uri})){ # try to connect if failed
+            sleep 5;
+        }
+    }
+}
+

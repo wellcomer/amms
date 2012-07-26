@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# AMMS console client (C) 2009
+# AMMS console client (C) 2012
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,60 +15,52 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use strict;
-no  strict 'refs';
-use lib '/usr/lib/amms';
-use Getopt::Long;
-use POSIX qw(strftime);
+no  strict "refs";
+use feature qw(say);
+
+use lib "/usr/lib/amms";
+use AMMS::Lib qw(:all);
 use AMMS::Client;
-use Carp;
 
-my $VERSION = 0.1;
+my $VERSION = 0.2;
 
-my %menu;
-my (%type, %stat);
+my (%menu, %type, %stat);
 
-$menu {action} = [qw(limit reset)];
+$menu {action} = [qw(limit reset extension status)];
 $menu {type} = [qw(temp ident parent)];
 $menu {stat} = [qw(off on disabled)];
 
 %type = (temp => "T", ident => "I", parent => "P");
 %stat = (off => 0, on => 1, disabled => 2);
 
-my ($uri, $profile, $command);
-
-GetOptions ("uri|u=s" => \$uri, "profile|p=s" => \$profile, "exec|e=s" => \$command);
-
-if ($uri eq "" or $command eq ""){
-    print "Usage: ammsc --uri|-u uri [--profile|-p profile] --exec|-e command\n";
+unless (@ARGV){
+    say "Usage: ammsc uri arguments";
     exit;
 }
 
-$profile ||= "default";
-
-my ($action, $ident, @argv) = split (/\s+/, $command);
+my ($uri, $action, @argv) = @ARGV;
 
 my $ammsc = AMMS::Client->new;
-   $ammsc->connect ($uri) || croak "Can't connect to ammsd URI: $uri";
+   $ammsc->connect ($uri) || die "Can't connect to ammsd URI: $uri";
 
-my @ext_list = split_res ($ammsc->exe ("ls_extension", $profile));
-push @{$menu {action}}, @ext_list;
+my $res = $ammsc->exe ("ls_extension");
+die $res->{s} if ($res->{s} =~ /^ERR/);
+
+my $ext = xb $res;
+push @{$menu {action}}, @$ext;
 
 $action = cword ($menu {action}, $action);
-$action || croak "Undefined action";
+$action || die "Undefined action";
 
 if (exists (&$action)){ # run internal
-    &$action ($ident, @argv);
+    &$action (@argv);
 }
 else { # run extension
-    my @ext_res = exe ("run_extension", $action, $ident, @argv);
-
-    unless (defined $ext_res [0]){
-        err ();
-    }
-    else {
-        print join ("\n", @ext_res);
-        print "\n";
-    }
+    $uri = xb $ammsc->exe ("get_extension_runner");
+    $ammsc->connect ($uri) || die "Can't connect to extension runner URI: $uri";
+    $res = $ammsc->exe ("run_extension", {name=>$action, arg=>\@argv});
+    die $res->{s} if ($res->{s} =~ /^ERR/);
+    print xb $res;
 }
 
 sub cword { # complete word
@@ -89,157 +81,279 @@ sub cword { # complete word
     return $word;
 }
 
-sub split_res {
-    return unless ($_[0]);
-    split (/\s/, shift);
-}
-
-sub ftime {
-    strftime "%a %b %e %H:%M:%S %Y", localtime shift;
-}
-
-sub ok {
-    print "OK " . $_[0] . "\n";
-}
-
-sub err {
-    my $err = shift || $ammsc->{err_desc};
-    print "ERR $err\n";
-}
-
 sub limit {
 
 #   ident (80M |no|state|desc|parent) [1d] [temp|ident|parent]
 
-    my ($ident, $value, $time, $type) = @_;
+    my ($ident, $value, $period, $type) = @_;
+
+    my ($res, $limit);
 
     unless ($ident){ # list all limits
 
-        my @limit = exe ("list_limits");
+        $limit = xb $ammsc->exe ("get_limit");
+
+        my @limit;
+
+        for $type (keys %$limit){
+            my $limit_list = $limit->{$type};
+            for (keys %$limit_list){
+                $limit->{$type}{$_}{type} = $type;
+                $limit->{$type}{$_}{ident} = $_;
+                push @limit, $limit->{$type}{$_};
+            }
+        }
+
         my @limit_val;
         my @limit_sorted;
         
-        foreach (@limit){
-            next unless $_; # skip empty limit
-            @limit_val = split_res ($_);
-            $limit_val [2] = '-' if ($limit_val [2] eq '');
-            $limit_val [3] = '-' if ($limit_val [3] eq '');
-            $limit_val [4] = '-' if ($limit_val [4] eq '');
-            $limit_val [5] = '-' if ($limit_val [5] eq '');
-            push @limit_sorted, sprintf ("%s %-16s %-16s %6s %6s %s %s %s %s\n", @limit_val);
+        for my $l (@limit){
+
+            unless (defined $l->{value}){
+                $l->{value} = "-";
+            }
+
+            # type ident parent value period stat ts desc
+            push @limit_sorted, sprintf ("%s %-16s %-16s %6s %6s %s %s %s %s",
+                 $l->{type},
+                 $l->{ident},
+                 $l->{parent} || "-",
+                 $l->{value},
+                 $l->{period} || "-",
+                 $l->{stat},
+                 format_time ($l->{ts}),
+                 $l->{desc} || "-");
         }
         @limit_sorted = sort @limit_sorted;
-        print foreach @limit_sorted;
+        say join ("\n", @limit_sorted);
         return;
     }
 
     $type = cword ($menu {type}, $type); # complete type
     $type = $type {$type};
 
-    my @val; # limit fields
-
     unless ($type){
 
-        ($type, @val) = split_res (exe("get_anylimit", $ident));
+        $limit = xb $ammsc->exe ("get_anylimit", {ident=>$ident});
 
         unless (defined $value){ # print limit
-            if (@val){
-                $val[1] = "-" if ($val[1] eq "");
-                $val[5] = $val[5] . " " . format_time ($val[5]);
-            }
-            @val ? print sprintf ("%s %s %s %s %s %s %s %s\n", $type, @val) : err ("Not found");
+            die "Not found" unless ($limit);
+            printf ("%s %s %s %s %s %s %s %s %s\n",
+                $limit->{type},
+                $limit->{ident},
+                $limit->{parent} || "-",
+                $limit->{value},
+                $limit->{period},
+                $limit->{stat},
+                $limit->{ts},
+                format_time ($limit->{ts}),
+                $limit->{desc});
             return;
         }
-        $type ||= $type {ident};
+        if ($limit){
+            $type = $limit->{type};
+        }
+        $type ||= $type {ident}; # set default limit type to ident
     }
     if ($value eq "no"){
-        err ("Not found") && return unless (@val);
-        exe ("remove_limit", $type, $ident) ? ok : err;
+
+        say xs $ammsc->exe ("remove_limit", {type=>$type, ident=>$ident});
         return;
     }
     elsif ($value =~ /^st*a*t*e*/i){
 
-        err ("Not found") && return unless (@val);
+        die "Not found" unless ($limit);
 
-        my $stat = $time;
+        my $stat = $period;
 
         if ($stat){
             $stat = cword ($menu {stat}, $stat); # complete type
             $stat = $stat {$stat};
             unless (defined $stat){
-                err "Unknown stat value";
-                return;
+                die "Unknown stat value";
             }
-            exe ("update_limit", $type, $ident, "stat", $stat) ? ok : err;
+            say xs $ammsc->exe ("update_limit", {type=>$type, ident=>$ident, stat=>$stat});
+        }
+        else { # print stat
+            say $limit->{stat};
         }
         return;
     }
     elsif ($value =~ /^pa*r*e*n*t*/){
 
-        my $par = $time;
+        my $par = $period;
+
         unless (defined $par){
-            err ("Not found") && return unless (@val);
-            print $val [1] . "\n";
+            die "Not found" unless ($limit);
+            say $limit->{parent};
         }
         else {
-            unless (@val){
-                exe ("add_limit_template", $type, $ident);
+            unless ($limit){
+                $ammsc->exe ("add_limit", {type=>$type, ident=>$ident, stat=>$stat{on}});
             }
-            undef $par if ($par eq "no");
-            exe ("update_limit", $type, $ident, "parent", $par) ? ok : err;            
+            my $parent = xb $ammsc->exe ("get_limit", {type=>$type{parent}, ident=>$par});
+
+            if ($par eq "no"){
+                say xs $ammsc->exe ("update_limit", {type=>$type, ident=>$ident, parent=>undef, value=>$limit->{value}, period=>$limit->{period}});
+                $ammsc->exe ("update_limit_ts", {type=>$type, ident=>$ident, period=>$limit->{period}});
+            }
+            else {
+                say xs $ammsc->exe ("update_limit", {type=>$type, ident=>$ident, parent=>$par, value=>undef, period=>undef});
+                $ammsc->exe ("update_limit_ts", {type=>$type, ident=>$ident, period=>$parent->{period}});
+            }
         }
         return;
     }
     elsif ($value =~ /^de*s*c*/){
-        err ("Not found") && return unless (@val);
-        my $desc = $time;
+        die "Not found" unless ($limit);
+        my $desc = $period;
         unless (defined $desc){
-            print $val [6] . "\n";
+            say $limit->{desc};
         }
         else {
             undef $desc if ($desc eq "no");
-            exe ("update_limit", $type, $ident, "desc", $desc) ? ok : err;
+            say xs $ammsc->exe ("update_limit", {type=>$type, ident=>$ident, desc=>$desc});
         }
         return;
     }
     elsif ($value =~ /^re*n*a*m*e*/){
-        err ("Not found") && return unless (@val);
-        my $ident2 = $time;
-        unless (defined $ident2){
-            err ("Unknown ident2");
+        
+        unless ($limit){
+            die "Not found";
         }
-        else {
-            exe ("update_limit", $type, $ident, "ident", $ident2) ? ok : err;
+        
+        my $ident2 = $period;
+        undef $period;
+        
+        unless ($ident2){
+            die "Unknown ident2";
         }
+        
+        $ammsc->exe ("remove_limit", {type=>$type, ident=>$ident});
+        
+        $limit->{ident} = $ident2;
+        
+        if ($limit->{parent}){ # inherit value, period from parent
+            $period = $limit->{period};
+            delete $limit->{value};
+            delete $limit->{period};
+        }
+
+        say xs $ammsc->exe ("add_limit", $limit);
+        $ammsc->exe ("update_limit_ts", {type=>$limit->{type}, ident=>$limit->{ident}, period=>$period}) if $period;
         return;
     }
     elsif ($value =~ /^ov*e*r*/){
-        if ($time eq "no"){
+        if ($period eq "no"){
             limit ($ident, "no");
             return;
         }
+        undef $limit;
         $type = $type {temp};
         $value = 0;
     }
-    $time ||= "1d";
-    exe ("add_limit", $type, $ident, uc($value), $time, 1) ? ok : err;
+
+    if ($value !~ /^\d+[kmg]??$/i){
+        die "Bad value format";
+    }
+
+    unless ($limit){ # new limit
+        $limit = {type=>$type, ident=>$ident, value=>uc($value), period=>$period || "1d", stat=>$stat{on}};
+    }
+    else { # update limit
+       $limit->{value} = uc($value) if defined $value; 
+       $limit->{period} = $period if defined $period;
+    }
+
+    if ($limit->{parent}){ # inherit value, period from parent
+        delete $limit->{value};
+        delete $limit->{period};
+    }
+
+    say xs $ammsc->exe ("add_limit", $limit);
 }
 
 sub reset {
 
     my $ident = shift;
-    my $res = exe ("reset_traf", $ident);
-    if ($res eq "0E0"){
-        err ("Not found");
-        return;
-    }
-    ok;
+    say xs $ammsc->exe ("reset_traf", {ident=>$ident});
 }
 
-sub exe {
-    
-    my ($cmd, @arg) = @_;
-    return $ammsc->exe ($cmd, $profile, @arg);
+sub extension {
+    say join ("\n", sort @$ext);
+}
+
+sub status {
+
+    my ($ident) = @_;
+
+    my ($limit, $traf);
+
+    unless ($ident){ # list all stats
+
+        $limit = xb $ammsc->exe ("get_limit");
+        $traf = xb $ammsc->exe ("get_traf");
+
+        my @limit;
+
+        for my $type (keys %$limit){
+            my $limit_list = $limit->{$type};
+            for (keys %$limit_list){
+                $limit->{$type}{$_}{type} = $type;
+                $limit->{$type}{$_}{ident} = $_;
+                push @limit, $limit->{$type}{$_};
+            }
+        }
+
+        my @limit_val;
+        my @limit_sorted;
+        
+        for my $l (@limit){
+
+            unless (defined $l->{value}){
+                $l->{value} = "-";
+            }
+
+            next if (!$traf->{$l->{ident}}[0] && !$traf->{$l->{ident}}[1]); # skip items with 0/0 traf
+
+            # type ident parent traf cached value period stat ts desc
+            push @limit_sorted, sprintf ("%s %-16s %-16s %10s %10s %6s %6s %s %s %s %s",
+                 $l->{type},
+                 $l->{ident},
+                 $l->{parent} || "-",
+                 kmg ($traf->{$l->{ident}}[0]) || 0,
+                 kmg ($traf->{$l->{ident}}[1]) || 0,
+                 $l->{value},
+                 $l->{period} || "-",
+                 $l->{stat},
+                 format_time ($l->{ts}),
+                 $l->{desc} || "-");
+        }
+        @limit_sorted = sort @limit_sorted;
+        say join ("\n", @limit_sorted);
+        return;
+    }
+    else {
+
+        $limit = xb $ammsc->exe ("get_anylimit", {ident=>$ident});
+        
+        die "Not found" unless ($limit);
+
+        $traf = xb $ammsc->exe ("get_traf", {ident=>$ident});
+
+        printf ("%s %s %s %s %s %s %s %s %s %s %s\n",
+            $limit->{type},
+            $limit->{ident},
+            $limit->{parent} || "-",
+            kmg ($traf->[0]) || 0,
+            kmg ($traf->[1]) || 0,
+            $limit->{value},
+            $limit->{period},
+            $limit->{stat},
+            $limit->{ts},
+            format_time ($limit->{ts}),
+            $limit->{desc});
+    }
 }
 
 sub format_time {

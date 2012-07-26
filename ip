@@ -16,5 +16,9 @@ my $user_log = locate ($ident, "log");
 my $date = fdate ($date);
 
 my $grep = which ("grep");
+my $sort = which ("sort");
+my $cut  = which ("cut");
 
-print `$grep $date $user_log`; 
+print `$grep $date $user_log | $cut -d " " -f 3 | $sort -u`;
+
+

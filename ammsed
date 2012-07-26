@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Hash support for AMMS (C) 2012
+# AMMS FCGI extension runner (C) 2012
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,23 +15,24 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package AMMS::Hash;
 use strict;
 
 use lib "/usr/lib/amms";
 use AMMS::Lib qw(:all);
 
+use utf8;
+
 use FCGI;
 use FCGI::ProcManager qw(pm_manage pm_pre_dispatch pm_post_dispatch);
 use Daemon::Generic;
 use URI::Escape;
-use Data::Dumper;
+use IPC::Run qw(run timeout);
 
-our $VERSION = "0.2";
-our $DEBUG = 1;
-our $NAME = "hashd";
+our $NAME = "ammsed";
+our $VERSION = 0.1;
+our $DEBUG = 0;
 
-my ($conf, $json, $fh);
+my ($conf, $fh, $json);
 
 newdaemon (
     pidfile  => locate_pid ("$NAME.pid"),
@@ -43,10 +44,7 @@ sub gd_preconfig {
     my ($self) = @_;
 
     $conf = conf ($self->{configfile});
-    
-    open ($fh, "+<", $conf->{hashd}{file}) or die "$! " . $conf->{hashd}{file};
-    $json = decf ($fh);
-    
+
     return ();
 }
 
@@ -62,13 +60,18 @@ sub gd_kill {
 
 sub gd_run {
 
-    my $socket  = FCGI::OpenSocket ($conf->{hashd}{socket}, $conf->{hashd}{queue});
+    my $socket  = FCGI::OpenSocket ($conf->{$NAME}{socket}, $conf->{$NAME}{queue});
     my $request = FCGI::Request (\*STDIN, \*STDOUT, \*STDERR, \%ENV, $socket, FCGI::FAIL_ACCEPT_ON_INTR);
+
+    my $path = $ENV{PATH};
     
-    pm_manage (pm_title => "$NAME-pm", n_processes => 1);
-    runas ($conf->{hashd}{user});
+    pm_manage (pm_title => "$NAME-pm", n_processes => $conf->{$NAME}{instances});
+
+    runas ($conf->{$NAME}{user});
     
     $0 = $NAME;
+
+    my ($req, $sub, $res);
 
     while ($request->Accept() >= 0) {
 
@@ -76,7 +79,7 @@ sub gd_run {
         
         print "Content-Type: text/plain\n\n";
 
-        my $req = do { local $/; <STDIN> };
+        $req = do { local $/; <STDIN> };
 
         if ($req){
             $req = substr ($req, 2); # skip q=
@@ -88,11 +91,16 @@ sub gd_run {
             pm_post_dispatch ();
             next;
         }
+        
+        $sub = $req->{f};
+        delete $req->{f};
+
+        $ENV{PATH} = $path; # PATH for File::Which
 
         debug ($req);
-        my $res = eval __PACKAGE__ . "::" . $req->{f} . '($req)';
+        $res = eval __PACKAGE__ . "::" . $sub . '($req)';
         debug ($res);
-        
+
         $res->{s} = "ERR $@" if ($@);
 
         if ($res){        
@@ -109,57 +117,24 @@ sub debug {
     print STDERR Dumper ($_[0]);
 }
 
-sub set {
+sub run_extension {
 
     my $req = shift;
+    my ($name, $arg) = ($req->{name}, $req->{arg});
+
+    my $ext = $conf->{extension}{$name};
+    my @arg_from_conf;
+
+    ($ext, @arg_from_conf) = split (/\s+/, $ext);
     
-    $json->{$req->{key}} = $req->{val};
-    if (encf ($fh, $json)){
-        return {s=>"OK"};
-    }
-    return {s=>"ERR write failed"};
-}
+    my (@cmd, $in, $out, $err);
 
-sub get {
-    
-    my $req = shift;
-    return {s=>"OK", b=>$json->{$req->{key}}};
-}
+    push @cmd, $ext;
+    push @cmd, @arg_from_conf;
+    push @cmd, @$arg;
 
-sub get_all {
-    return {s=>"OK", b=>$json};
-}
+    run (\@cmd, \$in, \$out, \$err, timeout ($conf->{$NAME}{timeout})) or return {s=>"ERR $err"};
 
-sub rem {
-    
-    my $req = shift;
-
-    if (delete $json->{$req->{key}}){
-        if (encf ($fh, $json)){
-            return {s=>"OK"};
-        }
-        return {s=>"ERR write failied"};
-    }
-    return {s=>"ERR not found"};
-}
-
-sub check {
-    
-    my $req = shift;
-    
-    if ($json->{$req->{key}} eq $req->{val}){
-        return {s=>"OK"};
-    }
-    return {s=>"ERR not found"};
-}
-
-sub check2 {
-
-    my $req = shift;
-    
-    unless (exists $json->{$req->{key}}){
-        return {s=>"OK"};
-    }
-    return check ($req);
+    return {s=>"OK", b=>$out};
 }
 

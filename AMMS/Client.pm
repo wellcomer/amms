@@ -1,4 +1,4 @@
-# AMMS client module (C) 2010
+# AMMS client module (C) 2012
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,15 +17,14 @@ use strict;
 
 package AMMS::Client;
 
+use lib "/usr/lib/amms";
+use AMMS::Lib qw(:json);
+
 use HTTP::Lite;
-use URI::Escape;
 
-my $VERSION = 0.1;
+my $VERSION = 0.2;
 
-my $http;
-my $base_uri;
-my $err_desc;
-my $c2c;
+my ($http, $uri, $err_desc);
 
 sub new { 
 
@@ -38,7 +37,7 @@ sub connect {
     
     my ($self, $uri) = @_;
 
-    $self->{base_uri} = $uri;
+    $self->{uri} = $uri;
     $self->{http} = new HTTP::Lite;
 
     my $req = $self->{http}->request ($uri);
@@ -49,38 +48,25 @@ sub connect {
 
 sub exe {
     
-    my $self = shift;
-    my $cmd  = join (' ', @_);
+    my ($self, $function, $req) = @_;
+
+    $req->{f} = $function;
+    $req = enc ($req);
 
     $self->{http}->reset;
+    $self->{http}->prepare_post ({q=>$req});
 
-    $cmd = uri_escape ($cmd);
-    my $res = $self->{http}->request ($self->{base_uri} . "?q=$cmd");
+    my $res = $self->{http}->request ($self->{uri});
 
-    unless (defined $res) {
-        $self->{err_desc} = $self->{http}->status_message || "Connection failed";
+    if ($res != 200){
+        $self->{err_desc} = $self->{http}->status_message || "Connection timeout";
         return undef;
     }
 
-    my (@res, $line);
+    $res = $self->{http}->body;
+    $res = dec ($res) if ($res);
 
-    @res = split (/\n/, $self->{http}->body);
-
-    unless ($self->{c2c}){
-
-        if ($res [0] =~ /^ERR/){
-            $res [0] =~ s/^ERR //o;
-            $self->{err_desc} = $res [0];
-            return undef;
-        }
-    }
-    return wantarray ? @res : $res[0];
-}
-
-sub c2c {
-
-    my ($self, $val) = @_;
-    $self->{c2c} = $val;
+    return $res;
 }
 
 1;

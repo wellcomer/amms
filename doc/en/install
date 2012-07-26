@@ -12,13 +12,9 @@
  Copy the configuration file conf to /etc/amms/amms.conf
  and edit it to fit your needs.
 
- Create a database:
-
- mysql < /usr/lib/amms/doc/db
-
  Integration with SQUID:
 
- url_rewrite_program /usr/lib/amms/ammsrd -p squid
+ url_rewrite_program /usr/lib/amms/ammsrd
 
  Integration with web server:
 
@@ -38,35 +34,3 @@
 	fastcgi_pass   127.0.0.1:9002;
 	include fastcgi_params;
  }
-
-
- Start sequence:
-
- ammsd
- matchd
- hashd
- amms-tc-squid
-
- Dependencies:
-
- ammsc
-
- perl -MCPAN -e "install HTTP:: Lite"
-
- ammsd
-
- FCGI::ProcManager
- Config::General
- Params::Validate
- DBI
- DBD::mysql
-
- matchd
-
- Net:: IP:: CMatch
-
- amms-tc-squid
-
- File:: Tail
-
-

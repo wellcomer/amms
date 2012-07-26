@@ -6,15 +6,13 @@ use lib "/usr/lib/amms/";
 use AMMS::Lib qw(locate fdate);
 use File::Which;
 
-my ($ident, $date) = @ARGV;
+my ($ident, $count) = @ARGV;
 
 die "No ident" unless $ident;
 
-$date ||= "today";
+$count ||= 50;
 
 my $user_log = locate ($ident, "log");
-my $date = fdate ($date);
+my $tail = which ("tail");
 
-my $grep = which ("grep");
-
-print `$grep $date $user_log`; 
+print `$tail -n $count $user_log`;

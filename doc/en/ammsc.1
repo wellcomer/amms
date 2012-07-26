@@ -1,6 +1,6 @@
 .\"Created with GNOME Manpages Editor Wizard
 .\"http://sourceforge.net/projects/gmanedit2
-.TH ammsc 1 "October 25, 2011" "0.9" "An account management system for SQUID"
+.TH ammsc 1 "April 25, 2012" "1.9" "An account management system for SQUID"
 
 .SH NAME
 ammsc \- amms console client
@@ -12,7 +12,7 @@ arguments
 .br
 
 .SH DESCRIPTION
-AMMS client implements GET requests by HTTP protocol for limit and extensions management.
+AMMS client implements requests by HTTP protocol for limit and extensions management.
 The distribution of request, authentication and other additional possibilities provides a high performance http server.
 The command is extension name or ammsc built-in command.
 The syntax supports abbreviation of commands and arguments if no conflicts with other names.
@@ -22,7 +22,7 @@ The syntax supports abbreviation of commands and arguments if no conflicts with 
 [ident] [V|no|state|desc|parent|rename|over] [P|no] [t|i|p]
 .RS
 
-ident - user identificator, V - traffic amount (B,KB,MB,GB), P - period (s/m/h/d - sec/min/hour/day)
+ident - user identificator, V - traffic amount (KB,MB,GB), P - period (m/h/d - min/hour/day)
 
 Set user limit for user1, 100M to 24 hr from day begin (timer is abs), from the time of limit setting (the timer is rel)
 
@@ -61,6 +61,11 @@ Set overlimit for specified period, example 3 days:
 Remove overlimit by hand:
 
 	ammsc li user1 over no
+
+Output format:
+
+     limit_type ident parent limit_value period limit_state unixtime date time description
+
 .RE
 
 .B reset
@@ -69,49 +74,30 @@ ident
 Reset traffic
 .RE
 
-.SH EXTENSIONS
+.B stat
+ident
+
+.RS
+The volume of traffic used for the period of the limit
+ident - user id, default - all users
+
+Output format:
+
+    limit_type ident parent traffic traffic_cached limit_value period limit_state unixtime date time description
+.
+.RE
+
 .B ext
 .RS
 Extensions list
 .RE
 
-.B history
-ident [time] [count]
-
-.RS
- History of visited sites
- ident - user id
- time - time, default is last 25 records
- count - output records count
-
- Time format (time): YYYY-MM, YYYY-MM-DD
-.RE
-
-.B ignore
-[ls|rem|add] [num|rec]
-
-.RS
- Ignored for counting addresses
- ls - view
- rem num - Remove record with number num
- add rec - add record rec (symbol name example ya.ru, 
- network address example 192.168.0.0/16 or host address)
-.RE
-
-
-.B import
-filename
-
-.RS
- Import limits into DB
- For export use: ammsc li > filename
-.RE
-
-.B lock
+.SH EXTENSIONS
+.B bind
 [ls|set ident ip|rem num|get ident|check ident ip]
 
 .RS
- Lock login to the specified IP, logins from other IPs disabled.
+ Bind login to the specified IP, logins from other IPs disabled.
  ls - view
  set - link ident to ip
  rem num - remove record with number num
@@ -119,21 +105,43 @@ filename
  check ident ip - check access by ident and ip
 .RE
 
-.B stat
-ident
+.B history
+ident [time]
 
 .RS
- The volume of traffic used for the period of the limit
- ident - user id, default - all users
+ History of visited sites
+ ident - user id
+ date - date, default is today
+
+ Date format (date): YYYYMM, "YYYYMMDD HHMMSS"
+.RE
+
+.B log
+ident [count]
+
+.RS
+ Tail of user log
+ ident - user id
+ count - output lines count (default is 50)
 .RE
 
 .B traf
-ident time [detail]
+ident date
 
 .RS
  The volume of traffic used for specified period
  ident - user id, default - all users
- detail - detail information about traffic per site
+ date - date
+.RE
+
+.B uri
+ident date [detail]
+
+.RS
+ The volume of traffic by URL used for specified period
+ ident - user id
+ date - date
+ detail - detailed information
 .RE
 
 .SH "SEE ALSO"

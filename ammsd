@@ -1,5 +1,6 @@
 #!/usr/bin/perl
-# AMMS FCGI (C) 2009
+
+# AMMS FCGI (C) 2012
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,303 +16,132 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use strict;
+no warnings;
 
 package AMMSD;
 
+use lib "/usr/lib/amms";
+use AMMS::Lib qw(:all);
+use AMMS::Client;
+
 use FCGI;
 use FCGI::ProcManager qw(pm_manage pm_pre_dispatch pm_post_dispatch);
+use File::Path qw(remove_tree);
+use Daemon::Generic;
+use URI::Escape;
+use Time::Local;
 
-use DBI;
-use Sys::Syslog qw(:standard :macros);
-use Config::General;
-use Getopt::Long;
-use Params::Validate qw(:all);
-use POSIX;
-use Carp;
-use IPC::SysV qw(IPC_CREAT SETVAL IPC_RMID);
+our $NAME = "ammsd";
+our $VERSION = 1.9;
+our $DEBUG = 0;
 
-use lib '/usr/lib/amms/';
-
-my $VERSION = 0.9;
-my $DEBUG = 0;
-
-my %config;
-my %db;
-my $db;
-
-my $config_file;
-my $foreground;
-my $pid_file = "/var/run/ammsd.pid";
-
-my $validate_type_regex = qr/(T|I|P)/;
-my $validate_value_regex = qr/\d+\.*\d*(b|k|m|g|$)/i;
-my $validate_period_regex = qr/\d+(s|m|h|d)/i;
-
-my $IPC_KEY = 29710;
-my $IPC_OPS_WAIT = pack ("s!3", 0, 0, 0);
-my $IPC_OPS_INC  = pack ("s!3", 0, 1, 0);
-my $IPC_OPS_DEC  = pack ("s!3", 0, -1, 0);
-
-sub validation_err {
-    croak shift;
+if ($DEBUG){
+    use Data::Dumper;
 }
 
-sub load_config {
-    
-    $config_file ||= '/etc/amms/amms.conf';
+my ($conf, $fh, $json);
 
-    %config = ();    
-    %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
+newdaemon (
+    pidfile  => locate_pid ("$NAME.pid"),
+    progname => $NAME
+);
+
+sub gd_preconfig {
     
-    my $keys_count = scalar keys (%config);
+    my ($self) = @_;
+
+    $conf = conf ($self->{configfile});
+
+    my $loc = locate (".amms", "limit");
+    open ($fh->{limit}, "+<", $loc) or die "$! " . $loc;
+
+    $loc = locate (".amms", "traf");
+    open ($fh->{traf}, "+<", $loc) or die "$! " . $loc;
+
+    $loc = locate (".amms", "uri");
+    open ($fh->{uri}, "+<", $loc) or die "$! " . $loc;
     
-    openlog ('ammsd', $config {ammsd}{log}{options} || 'ndelay,pid', $config {ammsd}{log}{facility} || 'daemon');
-    syslog ('notice', "Configuration file $config_file has $keys_count keys");
+    $json->{limit} = decf ($fh->{limit});
+    $json->{traf} = decf ($fh->{traf});
+    $json->{uri} = decf ($fh->{uri});
     
-    unless ($keys_count){
-        error ("Bad configuration in $config_file", 1);
+    return ();
+}
+
+sub gd_kill {
+
+    my ($self, $pid) = @_;
+
+    if (kill ("TERM", $pid)){
+        print "Process $pid is gone\n";
     }
-
-    return $keys_count;
+    sleep 1;
 }
 
-validation_options (on_fail => \&AMMSD::validation_err);
+sub gd_run {
 
-GetOptions ("config|c=s" => \$config_file, "foreground|f" => \$foreground);
-
-my $op = $ARGV [0] || "";
-
-if ($op =~ /^start$/i){
-
-    load_config ();
-    run ($foreground);
-}
-elsif ($op =~ /^stop$/i){
-    if (stop ()){ # kill running instance
-        print "OK\n";
-    }
-    exit;
-}
-elsif ($op =~ /^restart$/i){
-    print "Restarting...\n";
-    stop ();
-    sleep (1);
-    load_config ();
-    run ($foreground);
-}
-elsif ($op =~ /^testconfig$/i){
-    load_config ();
-    print "OK\n";
-    exit;
-}
-elsif ($op =~ /^status$/i){
-    status ();
-    exit;
-}
-elsif ($op =~ /^version$/i){
-    print "$VERSION\n";
-    exit;
-}
-else {
-    print "ammsd $VERSION\n";
-    print "Usage: ammsd [--config|-c file] [--foreground|-f] start|stop|restart|testconfig|status|version\n";
-    exit;
-}
-
-sub status {
-
-    my $pid;
-
-    if (open (FH, "<$pid_file")){
-        $pid = <FH>;
-        close FH;
-    }
+    my $socket  = FCGI::OpenSocket ($conf->{ammsd}{socket}, $conf->{ammsd}{queue});
+    my $request = FCGI::Request (\*STDIN, \*STDOUT, \*STDERR, \%ENV, $socket, FCGI::FAIL_ACCEPT_ON_INTR);
     
-    if ($pid){
-        if (kill (0, $pid)){
-            print "Running with pid $pid\n";
-            return;
+    pm_manage (pm_title => "$NAME-pm", n_processes => 1);
+    runas ($conf->{ammsd}{user});
+    
+    $0 = $NAME;
+
+    my ($req, $sub, $res);
+
+    while ($request->Accept() >= 0) {
+
+        pm_pre_dispatch ();
+        
+        print "Content-Type: text/plain\n\n";
+
+        $req = do { local $/; <STDIN> };
+
+        if ($req){
+            $req = substr ($req, 2); # skip q=
+            $req = uri_unescape ($req);
+            $req = dec ($req);
+        } 
+
+        unless ($req->{f}){
+            pm_post_dispatch ();
+            next;
         }
-        else {
-            print "Abnormal previous termination\n";
+        
+        $sub = $req->{f};
+        delete $req->{f};
+
+        debug ($req);
+        $res = eval __PACKAGE__ . "::" . $sub . '($req)';
+        debug ($res);
+
+        $res->{s} = "ERR $@" if ($@);
+
+        if ($res){        
+            print enc ($res);
         }
-    }
-    print "Not running\n";
-}
-
-sub run {
-
-    my $fg = shift;
-    my $pid;
-    
-    if (open (FH, "<$pid_file")){
-        $pid = <FH>;
-        close FH;
-    }
-    
-    if ($pid){
-        if (kill (0, $pid)){
-            error ("Already running with pid $pid", 1);
-        }
-        else {
-            error ("Abnormal previous termination");
-            unlink $pid_file or error ("Can't unlink pid file: $!", 1);
-            error ("Old pid file removed");
-        }
-    }
-    
-    return if $fg; # foreground mode
-    
-    # background mode
-    
-    $| = 1;
-    print "Running in background mode\n";
-    
-    chdir '/' or error ("Can't chdir to /: $!", 1);
-    umask 0;
-    
-    open STDIN, '/dev/null'   or error ("Can't read /dev/null: $!", 1);
-    open STDOUT, '>/dev/null' or error ("Can't write to /dev/null: $!", 1);
-    open STDERR, '>/dev/null' or error ("Can't write to /dev/null: $!", 1);
-
-    defined ($pid = fork)  or error ("Can't fork: $!");
-    exit if $pid;
-    setsid or error ("Can't start a new session: $!", 1);
-    
-    open (FH, ">$pid_file") or error ("Can't write pid file: $!", 1);
-    print FH $$;
-    close FH;
-
-    chmod 0644, $pid_file;
-
-    syslog ('notice', "Run OK");
-    syslog ('notice', sprintf ("listen on %s instances %s qlen %s", $config{ammsd}{socket}, $config{ammsd}{instances},$config{ammsd}{queue}));
-
-    # create sync instance
-
-    my $sem_id = semget ($IPC_KEY, 1, 0666 | IPC_CREAT ); 
-
-    unless (defined $sem_id){
-        syslog ('notice', "Can't create semaphore $!");
-        stop ();
-    }
-
-    syslog ('notice', "sem id $sem_id");
-    semctl ($sem_id, 0, SETVAL, 0);
-}
-
-sub stop {
-    
-    my $pid;
-    
-    if (open (FH, "<$pid_file")){
-        $pid = <FH>;
-        close FH;
-    }        
-    if ($pid){
-        unlink $pid_file;
-        my $sem_id = semget ($IPC_KEY, 0, 0);
-        semctl ($sem_id, 0, IPC_RMID, 0) if ($sem_id);
-        return kill ("TERM", $pid);
-    }
-}
-
-sub error {
-    
-    my ($msg, $die) = @_;
-    
-    $| = 1;
-    
-    syslog (LOG_ERR, $msg);
-    $die ? croak $msg : carp "$msg\n";
-}
-
-my $socket  = FCGI::OpenSocket ($config{ammsd}{socket}, $config{ammsd}{queue});
-my $request = FCGI::Request (\*STDIN, \*STDOUT, \*STDERR, \%ENV, $socket, FCGI::FAIL_ACCEPT_ON_INTR);
-
-pm_manage (n_processes => $config{ammsd}{instances});
-
-$0 = "ammsd";
-
-my $user = $config {ammsd}{user};
-
-if ($user){
-
-    use User::pwent;
-    my $pw = getpwnam ($user) || error ("Unknown user $user", 1);
-
-    if (POSIX::setgid ($pw->gid)){
-        syslog ('notice', "group id " . $pw->gid);
-    }
-    if (POSIX::setuid ($pw->uid)){
-        syslog ('notice', "user $user id " . $pw->uid);
-    }
-}
-
-while ($request->Accept() >= 0) {
-
-    pm_pre_dispatch ();
-
-    my ($req, $cmd, @arg, @res, $res);
-    
-    $req = $ENV {QUERY_STRING};
-    $req =~ s/\%([A-Fa-f0-9]{2})/pack('C', hex($1))/seg;
-    $req = substr ($req, 2);
-
-    ($cmd,@arg) = split (/\s/, $req);
-
-    print "Content-Type: text/plain\n\n";
-
-    unless ($cmd){
         pm_post_dispatch ();
-        next;
     }
 
-    debug ("> $_\n");
+    encf ($fh->{limit}, $json->{limit});
+    encf ($fh->{traf}, $json->{traf});
+    encf ($fh->{uri}, $json->{uri});
 
-    @res = eval __PACKAGE__ . "::$cmd" . '(@arg)';
-
-    if (@res){
-        if (ref ($res [0]) eq "ARRAY"){
-            foreach (@res){
-                $res = join (' ', @{$_});
-                $res.= "\n";
-                print $res;
-                debug ("< $res");
-            }
-        }
-        else {
-            $res = join (' ', @res);
-            $res.= "\n";
-            print $res;
-            debug ("< $res");
-        }
-    }
-    else{
-        print "ERR $@\n";
-    }
-
-    pm_post_dispatch ();
+    FCGI::CloseSocket($socket);
 }
-
-FCGI::CloseSocket($socket);
 
 sub debug {
     return unless $DEBUG;
-    print  STDERR $_[0];
-}
-
-sub get_config_loc {
-    return $config_file;
+    print STDERR Dumper ($_[0]);
 }
 
 sub byte {
 
-    validate_pos (@_, 1);
+    my $req = shift;
 
-    my ($value) = @_;
+    my $value = lc $req->{value}; 
 
-    $value = lc ($value);
     $value =~ /(\d+\.*\d*)([b|k|m|g]*)/;
 
     my $dig  = $1 || 0;
@@ -319,165 +149,177 @@ sub byte {
 
     my %mul = (b => 1, k => 1024, m => 1048576, g => 1073741824);
     my $byte = int $dig * $mul {$unit};
+
+    return {s=>"OK", b=>$byte};
 }
 
 sub delta_time {
 
-    validate_pos (@_, 1);
+    my $req = shift;
 
-    my ($value) = @_;
+    my $period = lc $req->{period};
    
-    $value = lc ($value);
-    $value =~ /(\d+)([s|m|h|d]*)/;
+    $period =~ /(\d+)([s|m|h|d]*)/;
 
     my $dig  = $1 || 0;
     my $unit = $2 || 'd'; # default unit is day
 
     my %mul = (s => 1, m => 60, h => 3600, d => 86400);
     my $delta_time = $dig * $mul {$unit};
-}
 
-sub get_dbh {
-
-    my $name = shift;
-    my $dbh = $db{$name}{handle};
-
-    if ($dbh){
-        unless ($dbh->ping){
-            $dbh->disconnect;
-            undef $dbh;
-        }
-    }
-    $dbh ||= DBI->connect ($config {$name}{db}{dsn}, $config {$name}{db}{user}, $config{$name}{db}{pass},
-                          {RaiseError => 1, PrintError => 1, AutoCommit => 1});
-
-    if ($dbh){
-        $db {$name}{handle} = $dbh;
-    }
-    return $dbh;
+    return {s=>"OK", b=>$delta_time};
 }
 
 sub get_limit {
 
-    validate_pos (@_, 1, {regex => $validate_type_regex}, 1);
-    my ($db_name, $type, $ident) = @_;
+    my $req = shift;
 
-    my $dbh = get_dbh ($db_name);
-    my @val = $dbh->selectrow_array ("select `parent`,`value`,`period`,`stat`,unix_timestamp(ts),`desc` from lim where type=? and ident=?",
-                                      undef, $type, $ident);
-    return @val;
+    my $limit = $json->{limit};
+
+    if (exists $req->{type}){
+        $limit = $limit->{$req->{type}};
+    }
+    if (exists $req->{ident}){
+        $limit = $limit->{$req->{ident}};
+    }
+
+    unless ($limit){
+        return {s=>"ERR not found"};
+    }
+
+    my %limit_copy = %$limit;
+
+    if ($req->{type} and $req->{ident}){
+        $limit_copy {type} = $req->{type};
+        $limit_copy {ident} = $req->{ident};
+    }
+    
+    return {s=>"OK", b=>\%limit_copy};
 }
 
 sub get_anylimit {
 
-    validate_pos (@_, 1, 1);
-    my ($db_name, $ident) = @_;    
+    my $req = shift;
 
-    my @val;    # value, period, stat, ts
-    my $type;   # limit type
-    my $group;  # user group
+    my $ident = $req->{ident};
+    
+    my $limit = xb get_limit {type=>"T", ident=>$ident}; # temp limit
 
-    $type = 'T';        # temp limit
-    @val = get_limit ($db_name, $type, $ident);
-
-    unless (@val) {
-        $type = 'I';    # ident limit
-        @val = get_limit ($db_name, $type, $ident);
+    unless ($limit) {
+        $limit = xb get_limit {type=>"I", ident=>$ident}; # ident limit
+    }
+    unless ($limit) {
+        $limit = xb get_limit {type=>"P", ident=>$ident}; # parent limit
+    }
+    unless ($limit){
+        return {s=>"ERR not found"};
     }
 
-    unless (@val) {
-        $type = 'P';    # parent limit
-        @val = get_limit ($db_name, $type, $ident);
-    }
+    if ($limit->{parent}){
 
-    my $par = $val [0] || 'default';
-    my @par_val = get_limit ($db_name, 'P', $par);
-  
-    if (@par_val){
-        my $i;
-        for ($i=1; $i <= $#par_val; $i++){
-            $val [$i] = $par_val [$i] unless (defined $val [$i]);
+        my $parent_limit = xb get_limit {type=>"P", ident=>$limit->{parent} || "default"};
+
+        if ($parent_limit){ # inheritance
+
+            for my $k (keys %$parent_limit) {
+		unless (defined $limit->{$k}){
+                    $limit->{$k} = $parent_limit->{$k};
+		}
+            }
         }
     }
-    
-    if (@val){
-        unshift @val, $ident;
-        unshift @val, $type;
-    }
-    return  @val;
+
+    return {s=>"OK", b=>$limit};
 }
 
 sub add_limit {
 
-    validate_pos (@_, 1, {regex => $validate_type_regex}, 1, {regex => $validate_value_regex}, {regex => $validate_period_regex}, 0, 0);
-    my ($db_name, $type, $ident, $value, $period, $stat, $desc) = @_;
+    # type, ident, value, period, stat, desc
 
-    my $dbh = get_dbh ($db_name);
+    my $req = shift;
+
+    my ($type, $ident) = ($req->{type}, $req->{ident});
+
+    unless ($type or $ident){
+        return {s=>"ERR bad param"};
+    }
 
     # save description if exists
 
-    my @val = get_limit ($db_name, $type, $ident);
-    $desc ||= $val [$#val];
+    my $limit = xb get_limit {type=>$type, ident=>$ident};
 
-    $dbh->do ("delete from lim where type=? and ident=?", undef, $type, $ident);
-    my $res = $dbh->do ("insert into lim(`type`,`ident`,`value`,`period`,`stat`,`desc`) values(?,?,?,?,?,?)",
-                         undef, $type, $ident, $value, $period, $stat, $desc);
+    if ($limit){ # save description if exists
+        $req->{desc} = $limit->{desc};
+    }
 
-    update_limit_ts ($db_name, $type, $ident, $period);
+    delete $req->{type};
+    delete $req->{ident};
 
-    return $res;
-}
+    $json->{limit}{$type}{$ident} = $req;
 
-sub add_limit_template {
- 
-    validate_pos (@_, 1, {regex => $validate_type_regex}, 1);
-    my ($db_name, $type, $ident) = @_;
+    mkdir (locate ($ident));
 
-    my $dbh = get_dbh ($db_name);
-
-    $dbh->do ("delete from lim where type=? and ident=?", undef, $type, $ident);
-    my $res = $dbh->do ("insert into lim(`type`,`ident`) values(?,?)", undef, $type, $ident);
-
-    return $res;
+    return update_limit_ts ({type=>$type, ident=>$ident, period=>$req->{period}});
 }
 
 sub remove_limit {
 
-    validate_pos (@_, 1, {regex => $validate_type_regex}, 1);
-    my ($db_name, $type, $ident) = @_;
+    my $req = shift;
+    
+    my ($type, $ident) = ($req->{type}, $req->{ident});
 
-    my $dbh = get_dbh ($db_name);
-
-    if ($dbh->do ("delete from lim where ident=? and type=?", undef, $ident, $type)){
-        return 1;
+    unless (delete $json->{limit}{$type}{$ident}){
+        return {s=>"ERR not found"};
     }
-    return undef;
+
+    unless (exists $json->{limit}{T}{$ident} or exists $json->{limit}{I}{$ident} or exists $json->{limit}{P}{$ident}){
+        remove_tree (locate ($ident));
+    }
+
+    if (encf ($fh->{limit}, $json->{limit})){
+        return {s=>"OK"};
+    }
+    return {s=>"ERR disk write failed"};
 }
 
 sub update_limit {
 
-    validate_pos (@_, 1, 1, 1, 1, 0);
-    my ($db_name, $type, $ident, $field, $value) = @_;
+    # type, ident, field, value
 
-    my $dbh = get_dbh ($db_name);
+    my $req = shift;
+    
+    my ($type, $ident) = ($req->{type}, $req->{ident});
 
-    if ($dbh->do ("update lim set `$field`=? where ident=? and type=?", undef, $value, $ident, $type)){
-        return 1;
+    unless (exists ($json->{limit}{$type}{$ident})){
+        return {s=>"ERR not found"};
     }
-    return undef;
+
+    delete $req->{type};
+    delete $req->{ident};
+
+    while (my ($k, $v) = each %$req){
+        $json->{limit}{$type}{$ident}{$k} = $v;
+    }
+
+    if (encf ($fh->{limit}, $json->{limit})){
+        return {s=>"OK"};
+    }
+    return {s=>"ERR disk write failed"};
 }
 
-sub update_limit_ts {
+sub update_limit_ts { # update limit timestamp based on timer type
     
-    validate_pos (@_, 1, 1, 1, 1);
-    my ($db_name, $type, $ident, $period) = @_;
+    my $req = shift;
 
-    my $dbh = get_dbh ($db_name);
+    my ($type, $ident, $period) = ($req->{type}, $req->{ident}, $req->{period});
+    
+    unless (exists ($json->{limit}{$type}{$ident})){
+        return {s=>"ERR not found"};
+    }
 
     my ($sec,$min,$hour,$mday,$mon,$year) = localtime (time);
-    $year += 1900; $mon += 1;
 
-    if ($config {$db_name}{timer} eq "abs"){ # absolute timer
+    if ($conf->{timer} eq "abs"){ # absolute timer
 
         if ($period =~ /m/){ # minutes
             $sec = 0;
@@ -489,209 +331,239 @@ sub update_limit_ts {
             $hour = $min = $sec = 0;
         }
     }
-    
-    my $ts = sprintf ("%04d%02d%02d%02d%02d%02d", $year, $mon, $mday, $hour, $min, $sec);
+    my $ts = timelocal ($sec, $min, $hour, $mday, $mon, $year);
 
-    if ($dbh->do ("update lim set `ts`=? where ident=? and type=?", undef, $ts, $ident, $type)){
-        return 1;
+    $json->{limit}{$type}{$ident}{ts} = $ts;
+    
+    if (encf ($fh->{limit}, $json->{limit})){
+        return {s=>"OK"};
     }
-    return undef;
-}
-
-sub list_limits {
-
-    validate_pos (@_, 1);
-    my ($db_name) = @_;
-    
-    my $dbh = get_dbh ($db_name);
-    my $limits = $dbh->selectall_arrayref ("select * from lim");
-
-    return @{$limits};
-}
-
-sub list_traf {
-
-    validate_pos (@_, 1);
-    my ($db_name) = @_;
-    
-    my $dbh = get_dbh ($db_name);
-    my $traf = $dbh->selectall_arrayref ("select * from traf");
-
-    return @{$traf};
+    return {s=>"ERR disk write failed"};
 }
 
 sub add_traf {
 
-    validate_pos (@_, 1, 1, 1, 0);
-    my ($db_name, $ident, $delta_size, $delta_size_hit) = @_;
+    my $req = shift;
 
-    $delta_size_hit ||= 0;
+    my ($ident, $delta_size, $delta_size_hit) = ($req->{ident}, $req->{size}, $req->{size_hit});
 
-    my $dbh = get_dbh ($db_name);
-    my $res = $dbh->do ("insert into traf (size,size_hit,ident) values (?,?,?) on duplicate key update size=size+$delta_size,
-                         size_hit=size_hit+$delta_size_hit", undef, $delta_size, $delta_size_hit, $ident);
-    return $res;
+    $json->{traf}{$ident}->[0] += $delta_size;
+    $json->{traf}{$ident}->[1] += $delta_size_hit;
+
+    return {s=>"OK"};
 }
 
 sub get_traf {
 
-    validate_pos (@_, 1, 1);
-    my ($db_name, $ident) = @_;
+    my $req = shift;
 
-    my $dbh = get_dbh ($db_name);
-    return $dbh->selectrow_array ("select size,size_hit from traf where ident=?", undef, $ident);
+    my $traf = $json->{traf};
+
+    if ($req->{ident}){
+        $traf = $traf->{$req->{ident}};
+    }
+    unless ($traf){
+        return {s=>"ERR not found"};
+    }
+    return {s=>"OK", b=>$traf};
 }
 
 sub reset_traf {
 
-    validate_pos (@_, 1, 1);
-    my ($db_name, $ident) = @_;
+    my $req = shift;
+    my $ident = $req->{ident};
 
-    my $dbh = get_dbh ($db_name);
+    my $limit = xb get_anylimit {ident=>$ident};
+    my $traf = xb get_traf {ident=>$ident};
 
-    my ($type,$stub,$parent,$value,$period,$stat,$ts) = get_anylimit ($db_name, $ident);
-    my ($size,$size_hit) = get_traf ($db_name, $ident);
-
-    if ($dbh->do ("update traf set size=0,size_hit=0 where ident=?", undef, $ident)){
-        if ($size != 0 or $size_hit != 0){
-            $dbh->do ("insert into tval (ident,size,size_hit,ts) values (?,?,?,from_unixtime(?))", undef, $ident, $size, $size_hit, $ts);
-        }
-        return 1;
+    unless ($traf){
+        return {s=>"ERR not found"};
     }
-    return undef;
+
+    if ($traf->[0] != 0 or $traf->[1] != 0){
+        
+        my $loc = locate (".amms", "tval"); # traffic value
+        
+        if (open (FH, ">>$loc")){
+            printf FH "%s %s %s %s\n", ts ($limit->{ts}), $ident, $traf->[0] || 0, $traf->[1] || 0;
+            close FH;
+        }
+        else {
+            warn "Can't write to $loc: $!";
+        }
+
+        $loc = locate ($ident, "uri"); # uri size
+
+        if (open (FH, ">>$loc")){
+            for my $uri (keys %{$json->{uri}{$ident}}){
+                printf FH "%s %s %s\n", ts ($limit->{ts}), $uri, $json->{uri}{$ident}{$uri}; # ts uri size
+            }
+            close FH;
+        }
+        else {
+            warn "Can't write to $loc: $!";
+        }
+    }
+
+    $json->{traf}{$ident} = [0,0]; # size, size_hit
+    delete $json->{uri}{$ident};
+
+    if (encf ($fh->{traf}, $json->{traf})){
+        return {s=>"OK"};
+    }
+    return {s=>"ERR disk write failed"};
+}
+
+sub add_uri {
+
+    my $req = shift;
+
+    my ($ts, $ip, $rcode, $size, $method, $uri, $ident, $mime) = 
+       ($req->{ts}, $req->{ip}, $req->{rcode}, $req->{size}, $req->{method},
+        $req->{uri}, $req->{ident}, $req->{mime});
+
+    my $loc = locate ($ident, "log");
+
+    if (open (FH, ">>$loc")){ # write personal log
+        print FH ts ($ts) . " $ip $rcode $size $method $uri $mime\n";
+        close FH;
+    }
+
+    my ($type, $http_rcode) = split (/\//, $rcode, 2);
+
+    return {s=>"ERR big rcode"} if ($http_rcode >= 400);
+
+    my $size_hit;
+
+    if ($method =~ /[gc][eo][tn]/i){ # GET | CONNECT
+        if ($type =~ /hit/i){ # check hit word
+            $size_hit = $size;
+            $size = 0;
+        }
+        else {
+            $json->{uri}{$ident}{$uri} += $size;
+        }
+        return add_traf {ident=>$ident, size=>$size, size_hit=>$size_hit};
+    }
+    return {s=>"ERR unsupported method"};
+}
+
+sub get_uri {
+
+    my $req = shift;
+
+    my $uri;
+
+    if ($req->{ident}){
+        $uri = $json->{uri}{$req->{ident}};
+    }
+    unless ($uri){
+        return {s=>"ERR not found"};
+    }
+    return {s=>"OK", b=>$uri};
 }
 
 sub check_access {
 
-    validate_pos (@_, 1, 1);
+    my $req = shift;
 
-    my ($db_name, $ident) = @_;
+    my $ident = $req->{ident};
 
-    my $sem_id = semget ($IPC_KEY, 0, 0);
-    semop ($sem_id, $IPC_OPS_WAIT); # wait for semaphore to be zero
-    semop ($sem_id, $IPC_OPS_INC);
+    my $limit = xb get_anylimit {ident=>$ident};
 
-    my ($type,$stub,$parent,$value,$period,$stat,$ts) = get_anylimit ($db_name, $ident);
-
-    unless ($type){
-        semop ($sem_id, $IPC_OPS_DEC);
-        return "ERR not found";
+    unless ($limit){
+        return {s=>"ERR not found"};
     }
 
-    if ($stat==2){
-        semop ($sem_id, $IPC_OPS_DEC);
-        return "ERR disabled by adm";
+    if ($limit->{stat}==2){
+        return {s=>"ERR disabled by adm"};
     }
 
-    my ($size,$size_hit) = get_traf ($db_name, $ident);
+    my $type = $limit->{type};
+
+    my $traf = xb get_traf {ident=>$ident};
+    my ($size,$size_hit) = @$traf;
 
     my $now = time;
-    my $delta_time = delta_time ($period);
-    my $size_limit = byte ($value);
+    my $delta_time = xb delta_time {period=>$limit->{period}};
+    my $size_limit = xb byte {value=>$limit->{value}};
 
-    $size += $size_hit if ($config {$db_name}{hit_count});
+    $size += $size_hit if ($conf->{hit_count});
 
-    if ($now >= ($ts + $delta_time)) { # expired limit
+    if ($now >= ($limit->{ts} + $delta_time)) { # expired limit
+        
         if ($type eq 'T'){
-            remove_limit ($db_name, $type, $ident);
-            semop ($sem_id, $IPC_OPS_DEC);
-            return "OK";
+            return remove_limit {type=>$type, ident=>$ident};
         }
         else {
-
-            reset_traf ($db_name, $ident);
-            update_limit_ts ($db_name, $type, $ident, $period);
-            update_limit ($db_name, $type, $ident, stat => 1) if ($stat == 0); # enable
-            event ($db_name, "check_access.enable", $type, $ident);
-            semop ($sem_id, $IPC_OPS_DEC);
-            return "OK";
+            reset_traf {ident=>$ident};
+            update_limit_ts {type=>$type, ident=>$ident, period=>$limit->{period}};
+            update_limit {type=>$type, ident=>$ident, stat => 1} if ($limit->{stat} == 0); # enable
+            event ({name=>"check_access.enable", arg=>[$type, $ident]});
+            return {s=>"OK"};
         }
     }
 
     if ($size_limit==0){ # unlim
-        semop ($sem_id, $IPC_OPS_DEC);
-        return "OK";
+        return {s=>"OK"};
     }
 
-    if ($size > $size_limit and $now < ($ts + $delta_time)){
-        if ($stat == 1){
-            update_limit ($db_name, $type, $ident, stat => 0);
-            event ($db_name, "check_access.disable", $type, $ident);
+    if ($size > $size_limit and $now < ($limit->{ts} + $delta_time)){
+        if ($limit->{stat} == 1){
+            update_limit {type=>$type, ident=>$ident, stat => 0};
+            event ({name=>"check_access.disable", arg=>[$type, $ident]});
         }
-        semop ($sem_id, $IPC_OPS_DEC);
-        return "ERR disabled by sys";
+        return {s=>"ERR disabled by sys"};
     }
 
-    if ($stat == 0){ # keep actual stat after reset_traf
-        update_limit ($db_name, $type, $ident, stat => 1);
-        event ($db_name, "check_access.enable", $type, $ident);
+    if ($limit->{stat} == 0){ # enable limit after reset_traf
+        update_limit {type=>$type, ident=>$ident, stat=>1};
+        event ({name=>"check_access.enable", arg=>[$type, $ident]});
     }
 
-    semop ($sem_id, $IPC_OPS_DEC);
-    return "OK";
-}
-
-sub run_extension {
-
-    validate_pos (@_, 1, 1, (0) x (@_ - 2));
-
-    my ($profile_name, $ext_name, @arg) = @_;
-    my ($ext, $res);
-
-    $ext = $config {$profile_name}{extension}{$ext_name};
-
-    my ($ext_type, $ext) = split (/\s/, $ext, 2);
-    $ext_type = lc $ext_type;
-
-    if ($ext_type eq "sh"){
-
-        unless (open (EXT, "$ext @arg 2>&1 |")){
-            return "ERR $!"
-        }
-        while (<EXT>){
-            $res .= $_;
-        }
-        close (EXT);
-    }
-    elsif ($ext_type eq "ammsc") {
-
-        my $arg0 = shift @arg;
-        unshift @arg, $profile_name;
-        unshift @arg, $arg0;
-
-        use AMMS::Client;
-        
-        my $ammsc = AMMS::Client->new;
-           $ammsc->connect ($ext) || return "ERR can't connect to $ext";
-           $ammsc->c2c (1);
-           return $ammsc->exe (@arg);
-    }
-    else {
-        return "ERR extension type $ext_type unknown";
-    }
-
-    return $res;
+    return {s=>"OK"};
 }
 
 sub ls_extension {
+    my @ext = keys %{$conf->{extension}};
+    return {s=>"OK", b=>\@ext};
+}
 
-    validate_pos (@_, 1);
-    my $profile_name = shift;
-
-    return keys %{$config {$profile_name}{extension}};
+sub get_extension_runner {
+    return {s=>"OK", b=>$conf->{ammsed}{uri}};
 }
 
 sub event {
 
-    my ($profile_name, $event_name, @argv) = @_;
+    my $req = shift;
+    my ($name, $arg) = ($req->{name}, $req->{arg});
     
-    syslog ('notice', $event_name . " " . join (" ", @argv));
+    # syslog ('notice', $event_name . " " . join (" ", @argv));
 
-    my $event_handler = $config {$profile_name}{event}{$event_name};
-    my ($ext_name, @arg) = split (/\s/, $event_handler, 2);
+    my $event = $conf->{event}{$name};
 
-    push @argv, @arg;
+    unless ($event){
+        return {s=>"ERR not found"};
+    }
 
-    run_extension ($profile_name, $ext_name, @argv);
+    my ($ext, @arg) = split (/\s+/, $event);
+
+    if ($arg){
+        push @arg, @$arg; # join event & ext arguments
+    }
+
+    $SIG{CHLD} = "IGNORE";
+
+    my $pid = fork;
+    return {s=>"OK", b=>$pid} if $pid;
+    
+    my $uri = $conf->{ammsed}{uri};
+
+    my $ammsc = AMMS::Client->new;
+       $ammsc->connect ($uri) || die "Can't connect to ammsed URI: $uri";
+
+    $ammsc->exe ("run_extension", {name=>$ext, arg=>\@arg});
+
+    exit 0;
 }
 

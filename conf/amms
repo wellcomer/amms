@@ -2,52 +2,54 @@
 
 ### BEGIN INIT INFO
 # Provides:          amms
-# Required-Start:    $local_fs $remote_fs $network $syslog
-# Required-Stop:     $local_fs $remote_fs $network $syslog
-# Should-Start:      $named $mysql $squid $nginx
+# Required-Start:    $local_fs $remote_fs $network $syslog $named
+# Required-Stop:     $local_fs $remote_fs $network $syslog $named
+# Should-Start:      nginx squid
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: starts the amms server
 # Description:       starts the amms server
 ### END INIT INFO
 
-PATH=/usr/lib/amms
+AMMSPATH=/usr/lib/amms
 NAME=amms
 DESC=amms
 
+CONF=/etc/amms/amms.conf
+
 set -e
 
-[ -x "$PATH/ammsd" ] || exit 0
+[ -x "$AMMSPATH/ammsd" ] || exit 0
 
 case "$1" in
 	start)
 		case "$2" in
 			ammsd)
 				echo -n "Starting $2: "
-				$PATH/ammsd start
+				$AMMSPATH/ammsd -c $CONF start
 				;;
-			matchd)
+			ammsed)
 				echo -n "Starting $2: "
-				$PATH/matchd start
+				$AMMSPATH/ammsed -c $CONF start
 				;;
 			hashd)
 				echo -n "Starting $2: "
-				$PATH/hashd start
+				$AMMSPATH/hashd -c $CONF start
 				;;
 			tc)
 				echo -n "Starting $2: "
-				$PATH/amms-tc-squid start
+				$AMMSPATH/ammstc -c $CONF start
 				;;
 			*)
 				echo "Starting all amms daemons"
 				echo -n "ammsd: "
-                                $PATH/ammsd start
-				echo -n "matchd: "
-				$PATH/matchd start
+                                $AMMSPATH/ammsd -c $CONF start
+				echo -n "ammsed: "
+				$AMMSPATH/ammsed -c $CONF start
 				echo -n "hashd: "
-				$PATH/hashd start
+				$AMMSPATH/hashd -c $CONF start
 				echo -n "tc: "
-				$PATH/amms-tc-squid start
+				$AMMSPATH/ammstc -c $CONF start
 				;;
 		esac
 		;;
@@ -56,65 +58,65 @@ case "$1" in
 		case "$2" in
 			ammsd)
 				echo -n "Stopping $2: "
-				$PATH/ammsd stop
+				$AMMSPATH/ammsd -c $CONF stop
 				;;
-			matchd)
+			ammsed)
 				echo -n "Stopping $2: "
-				$PATH/matchd stop
+				$AMMSPATH/ammsed -c $CONF stop
 				;;
 			hashd)
 				echo -n "Stopping $2: "
-				$PATH/hashd stop
+				$AMMSPATH/hashd -c $CONF stop
 				;;
 			tc)
 				echo -n "Stopping $2: "
-				$PATH/amms-tc-squid stop
+				$AMMSPATH/ammstc -c $CONF stop
 				;;
 			*)
 				echo "Stopping all amms daemons"
                                 echo -n "tc: "
-				$PATH/amms-tc-squid stop
+				$AMMSPATH/ammstc -c $CONF stop
                                 echo -n "hashd: "
-				$PATH/hashd stop
-                                echo -n "matchd: "
-				$PATH/matchd stop
+				$AMMSPATH/hashd -c $CONF stop
+                                echo -n "ammsed: "
+				$AMMSPATH/ammsed -c $CONF stop
                                 echo -n "ammsd: "
-				$PATH/ammsd stop
+				$AMMSPATH/ammsd -c $CONF stop
 				;;
 		esac
 		;;
 
 	restart|force-reload)
 
-                $PATH/ammsd testconfig || exit $?
+                $AMMSPATH/ammsd testconfig || exit $?
 
 		case "$2" in
 			ammsd)
 				echo -n "Restarting $2: "
-				$PATH/ammsd restart
+				$AMMSPATH/ammsd -c $CONF restart
 				;;
-			matchd)
+			ammsed)
 				echo -n "Restarting $2: "
-				$PATH/matchd restart
+				$AMMSPATH/ammsed -c $CONF restart
 				;;
 			hashd)
 				echo -n "Restarting $2: "
-				$PATH/hashd restart
+				$AMMSPATH/hashd -c $CONF restart
 				;;
 			tc)
 				echo -n "Restarting $2: "
-				$PATH/amms-tc-squid restart
+				$AMMSPATH/ammstc -c $CONF restart
 				;;
 			*)
 				echo "Restarting all amms daemons"
                                 echo -n "ammsd: "
-				$PATH/ammsd restart
-                                echo -n "matchd: "
-				$PATH/matchd restart
+				$AMMSPATH/ammsd -c $CONF restart
+                                echo -n "ammsed: "
+				$AMMSPATH/ammsed -c $CONF restart
                                 echo -n "hashd: "
-				$PATH/hashd restart
+				$AMMSPATH/hashd -c $CONF restart
                                 echo -n "tc: "
-				$PATH/amms-tc-squid restart
+				$AMMSPATH/ammstc -c $CONF restart
 				;;
 		esac
 		;;
@@ -123,29 +125,29 @@ case "$1" in
 		case "$2" in
 			ammsd)
 				echo -n "$2 status: "
-				$PATH/ammsd status
+				$AMMSPATH/ammsd -c $CONF status
 				;;
-			matchd)
+			ammsed)
 				echo -n "$2 status: "
-				$PATH/matchd status
+				$AMMSPATH/ammsed -c $CONF status
 				;;
 			hashd)
 				echo -n "$2 status: "
-				$PATH/hashd status
+				$AMMSPATH/hashd -c $CONF status
 				;;
 			tc)
 				echo -n "$2 status: "
-				$PATH/amms-tc-squid status
+				$AMMSPATH/ammstc -c $CONF status
 				;;
 			*)
 				echo -n "ammsd: "
-				$PATH/ammsd status
-				echo -n "matchd: "
-				$PATH/matchd status
+				$AMMSPATH/ammsd -c $CONF status
+				echo -n "ammsed: "
+				$AMMSPATH/ammsed -c $CONF status
 				echo -n "hashd: "
-				$PATH/hashd status
-				echo -n "amms-tc-squid: "
-				$PATH/amms-tc-squid status
+				$AMMSPATH/hashd -c $CONF status
+				echo -n "ammstc: "
+				$AMMSPATH/ammstc -c $CONF status
 				;;
 		esac
 		;;

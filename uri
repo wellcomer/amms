@@ -1,0 +1,79 @@
+#!/usr/bin/perl
+
+use strict;
+
+use utf8;
+use open qw(:std :utf8);
+
+use lib "/usr/lib/amms/";
+use AMMS::Lib qw(:all);
+use AMMS::Client;
+use File::Which;
+
+my ($uri, $ident, $date, $detail) = @ARGV;
+
+die "No uri" unless $uri;
+die "No ident" unless $ident;
+
+my $ammsc = AMMS::Client->new;
+
+unless ($ammsc->connect ($uri)){
+    die "Can't connect to amms daemon";
+}
+
+my $limit = xb $ammsc->exe ("get_anylimit", {ident => $ident});
+
+die "Not found" unless ($limit);
+
+$date ||= "today";
+
+my $file = locate ($ident, "uri");
+$date = fdate ($date);
+
+my $grep = which ("grep");
+
+my $text = `$grep $date $file`;
+my @line = split ("\n", $text);
+
+my %uri;
+
+# values from ident/uri
+
+for (@line){
+    my ($stub, $stub, $key, $size) = split;
+    $key = domain ($key) unless ($detail);
+    $uri{$key} += $size;
+}
+
+# values from ammsd
+
+my $ts = ts ($limit->{ts});
+$date =~ s/"//g;
+
+if (grep (/$date/, $ts)){
+    
+    my $uri2 = xb $ammsc->exe ("get_uri", {ident => $ident});
+    
+    for my $key2 (keys %$uri2){
+        my $key = $key2;
+        $key = domain ($key) unless ($detail);
+        $uri{$key} += $uri2->{$key2};
+    }
+}
+
+my @keys = sort { $uri{$b} <=> $uri{$a} } keys %uri; # sort by value
+
+for (@keys) {
+    printf "%7s %s\n", kmg ($uri{$_}), $_;
+};
+
+sub domain {
+
+    my $uri = shift;
+
+    $uri =~ /\/\/(.+?)\//;
+
+    my $dom = $1 || $uri;
+
+    return $dom;
+}

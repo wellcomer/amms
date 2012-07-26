@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# AMMS redirector for squid
+# AMMS redirector for Squid
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,37 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use lib '/usr/lib/amms';
+use lib "/usr/lib/amms";
+use AMMS::Lib qw(conf);
 use AMMS::Client;
-use Config::General;
 use Getopt::Long;
 
 use strict;
+use feature qw(say);
 
-my $config_file;
-my $profile;
-my %config;
+my $conf = conf ();
 
-GetOptions ("config|c=s" => \$config_file, "profile|p=s" => \$profile);
-
-sub load_config {
-
-    $config_file ||= "/etc/amms/amms.conf";
-    $profile ||= "default";
-    %config = Config::General::ParseConfig (-ConfigFile => $config_file, -InterPolateVars => 1);
-
-    unless (exists $config {$profile}){
-        die "Unknown profile name: $profile";
-    }
-    unless (exists $config {$profile}{ammsrd}){
-        die "No ammsrd section in $profile profile";
-    }
-}
-
-load_config ();
-
-my $ammsd_uri = $config{$profile}{ammsrd}{ammsd_uri};
-my $hashd_uri = $config{$profile}{ammsrd}{hashd_uri};
+my $ammsd_uri = $conf->{ammsrd}{ammsd_uri};
+my $hashd_uri = $conf->{ammsrd}{hashd_uri};
 
 my $ammsc = AMMS::Client->new;
 unless ($ammsc->connect ($ammsd_uri)){
@@ -57,49 +38,64 @@ unless ($hashd->connect ($hashd_uri)){
     undef $hashd;
 }
 
-undef $hashd if $config{$profile}{ammsrd}{ip_as_ident};
+undef $hashd if $conf->{ammsrd}{ip_as_ident};
 
 $|=1;
 
-my @f;
-my ($ident, $ip, $res);
+my (@f, $ident, $ip, $res);
 
 while (<>) {
 
-    unless (defined $ammsc){
-        print $config{$profile}{ammsrd}{t_interr} . "\n";
-        next;
-    }
+    chomp;
 
     my @f = split (/\s/);
-
-    $ip = substr ($f [1], 0, -2);
-
-    $ident = $f [2];
-    $ident = $ip if ($config{$profile}{ammsrd}{ip_as_ident});
     
-    if ($hashd){
+    unless (defined $ammsc){ # try to connect or say "internal error"
+        
+        $ammsc = AMMS::Client->new;
 
-        $res = $hashd->exe ("check2", "squid", "lock", $ident, $ip);
-
-        if ($res !~ /OK/i){
-            print $config{$profile}{ammsrd}{t_denybyip} . "\n";
+        unless ($ammsc->connect ($ammsd_uri)){
+            say $conf->{ammsrd}{t_interr};
+            undef $ammsc;
             next;
         }
     }
 
-    $res = $ammsc->exe ("check_access", "squid", $ident);
+    $ip = substr ($f [1], 0, -2);
 
-    if ($res =~ /OK/i){
-        print "\n";
+    $ident = $f [2];
+    $ident = $ip if ($conf->{ammsrd}{ip_as_ident});
+    
+    if ($hashd){
+
+        $res = $hashd->exe ("check2", {key=>"lock/$ident", val=>$ip});
+
+        exit unless defined $res; # restart process without hashd
+
+        if ($res->{s} !~ /OK/i){
+            say $conf->{ammsrd}{t_denybyip};
+            next;
+        }
+    }
+
+    $res = $ammsc->exe ("check_access", {ident=>$ident});
+
+    unless (defined $res){ # connection failed
+        say $conf->{ammsrd}{t_interr};
+        undef $ammsc;
         next;
     }
 
-    if ($ammsc->{err_desc} =~ /sys/){
-        print $config{$profile}{ammsrd}{t_overlim} . "\n";
+    if ($res->{s} =~ /OK/i){
+        say;
         next;
     }
 
-    print $config{$profile}{ammsrd}{t_deny} . "\n";
+    if ($res->{s} eq "ERR disabled by sys"){
+        say $conf->{ammsrd}{t_overlim};
+        next;
+    }
+
+    say $conf->{ammsrd}{t_deny};
 }
 

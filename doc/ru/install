@@ -13,13 +13,11 @@
  Скопируйте конфигурационный файл conf в /etc/amms/amms.conf
  и отредактируйте его под свои нужды.
 
- Создайте БД:
-
- mysql < /usr/lib/amms/doc/db
+ Скопируйте в $PATH ammsc_wrapper и переименуйте его в ammsc.
 
  Интеграция со SQUID:
 
- url_rewrite_program /usr/lib/amms/ammsrd -p squid
+ url_rewrite_program /usr/lib/amms/ammsrd
 
  Интеграция с WEB сервером:
 
@@ -40,32 +38,18 @@
 	include fastcgi_params;
  }
 
- Порядок запуска:
-
- ammsd
- matchd
- hashd
- amms-tc-squid 
-
  Зависимости:
 
- ammsc
+ HTTP::Lite
+ Daemon::Generic
 
- perl -MCPAN -e "install HTTP::Lite"
-
- ammsd
-
- FCGI::ProcManager
- Config::General
- Params::Validate
- DBI
- DBD::mysql
-
- matchd
-
- Net::IP::CMatch
-
- amms-tc-squid
-
- File::Tail
+ libexporter-tidy-perl
+ libconfig-general-perl
+ libjson-xs-perl
+ libfcgi-perl
+ libfcgi-procmanager-perl
+ libipc-run-perl
+ libfile-tail-perl
+ libfile-which-perl
+ libdevel-size-perl
 
