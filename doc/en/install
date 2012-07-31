@@ -1,36 +1,72 @@
- How to setup amms from git repository:
+  Installation from the AMMS GIT:
 
- Navigate to the target installation directory (can be arbitrary), for example:
+  Go to the target directory (can be arbitrary), for example:
 
- cd /home/user
- git clone git://github.com/wellcomer/amms.git
+  cd /home/user
+  git clone git://github.com/wellcomer/amms.git
 
- create a symlink:
+  create a symlink:
 
- ln -s /home/user/amms /usr/lib/amms
+  ln-s /home/user/amms /usr/lib/amms
 
- Copy the configuration file conf to /etc/amms/amms.conf
- and edit it to fit your needs.
+  Create a directory to store the data and set its own user nobody:
 
- Integration with SQUID:
+  mkdir /var/lib/amms
+  chown nobody /var/lib/amms
 
- url_rewrite_program /usr/lib/amms/ammsrd
+  Create a directory for the pid files:
 
- Integration with web server:
+  mkdir /var/run/amms
 
- nginx:
+  Create a directory for configuration files:
 
- location /ammsd.fcgi {
-	fastcgi_pass   127.0.0.1:9000;
-	include fastcgi_params;
- }
+  mkdir /etc/amms
 
- location /matchd.fcgi {
- 	fastcgi_pass   127.0.0.1:9001;
-	include fastcgi_params;
- }
+  Copy configuration files from conf in /etc/amms/
+  and edit them to suit your needs.
 
- location /hashd.fcgi {
-	fastcgi_pass   127.0.0.1:9002;
-	include fastcgi_params;
- }
+  cp -a /home/user/amms/conf/* /etc/amms/
+
+  Create a symlink for nginx:
+
+  ln -s /etc/amms/nginx.conf /etc/nginx/sites-enabled/amms
+
+  Restart nginx.
+
+  Copy to your $PATH ammsc_wrapper and rename it to ammsc.
+
+  Integration with the SQUID:
+
+  url_rewrite_program /usr/lib/amms/ammsrd
+
+  Dependencies:
+
+  perl-MCPAN-e "install HTTP :: Lite"
+  perl-MCPAN-e "install Daemon :: Generic"
+
+  packages from the repository, Debian / Ubuntu:
+
+  libexporter-tidy-perl
+  libconfig-general-perl
+  libjson-xs-perl
+  libfcgi-perl
+  libfcgi-procmanager-perl
+  libipc-run-perl
+  libfile-tail-perl
+  libfile-which-perl
+  libdevel-size-perl
+
+  Run:
+
+  /etc/amms/amms start
+ 
+  Stop:
+ 
+  /etc/amms/amms stop
+
+  Debian:
+
+  mv /etc/amms/amms /etc/init.d
+  insserv amms
+
+  invoke-rc.d amms (start | stop | restart | status)
