@@ -1,4 +1,3 @@
-
  Установка AMMS из GIT:
 
  Перейдите в целевой каталог установки (может быть произвольным), к примеру:
@@ -10,8 +9,29 @@
 
  ln -s /home/user/amms /usr/lib/amms
 
- Скопируйте конфигурационный файл conf в /etc/amms/amms.conf
- и отредактируйте его под свои нужды.
+ Создайте каталог для хранения данных и установите его владельцем пользователя nobody:
+
+ mkdir /var/lib/amms
+ chown nobody /var/lib/amms
+
+ Создайте каталог для pid файлов:
+
+ mkdir /var/run/amms
+
+ Создайте каталог для файлов конфигурации:
+
+ mkdir /etc/amms
+
+ Скопируйте конфигурационные файлы из conf в /etc/amms/
+ и отредактируйте их под свои нужды.
+
+ cp -a /home/user/amms/conf/* /etc/amms/
+
+ Создайте символическую ссылку для nginx:
+
+ ln -s /etc/amms/nginx.conf /etc/nginx/sites-enabled/amms
+
+ Перезапустите nginx.
 
  Скопируйте в $PATH ammsc_wrapper и переименуйте его в ammsc.
 
@@ -19,29 +39,12 @@
 
  url_rewrite_program /usr/lib/amms/ammsrd
 
- Интеграция с WEB сервером:
-
- nginx:
-
- location /ammsd.fcgi {
-	fastcgi_pass   127.0.0.1:9000;
-	include fastcgi_params;
- }
-
- location /matchd.fcgi {
- 	fastcgi_pass   127.0.0.1:9001;
-	include fastcgi_params;
- }
-
- location /hashd.fcgi {
-	fastcgi_pass   127.0.0.1:9002;
-	include fastcgi_params;
- }
-
  Зависимости:
 
- HTTP::Lite
- Daemon::Generic
+ perl -MCPAN -e "install HTTP::Lite"
+ perl -MCPAN -e "install Daemon::Generic"
+
+ пакеты из репозитория Debian/Ubuntu:
 
  libexporter-tidy-perl
  libconfig-general-perl
@@ -53,3 +56,18 @@
  libfile-which-perl
  libdevel-size-perl
 
+ Запуск:
+
+ /etc/amms/amms start
+ 
+ Остановка:
+ 
+ /etc/amms/amms stop
+
+ Debian:
+
+ mv /etc/amms/amms /etc/init.d
+ insserv amms
+
+ Далее штатными средствами: invoke-rc.d amms (start|stop|restart|status)
+ 
