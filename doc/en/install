@@ -7,7 +7,7 @@
 
   create a symlink:
 
-  ln-s /home/user/amms /usr/lib/amms
+  ln -s /home/user/amms /usr/lib/amms
 
   Create a directory to store the data and set its own user nobody:
 
