@@ -20,8 +20,6 @@ use strict;
 use lib "/usr/lib/amms";
 use AMMS::Lib qw(:all);
 
-use utf8;
-
 use FCGI;
 use FCGI::ProcManager qw(pm_manage pm_pre_dispatch pm_post_dispatch);
 use Daemon::Generic;
@@ -31,6 +29,10 @@ use IPC::Run qw(run timeout);
 our $NAME = "ammsed";
 our $VERSION = 0.1;
 our $DEBUG = 0;
+
+if ($DEBUG){
+    use Data::Dumper;
+}
 
 my ($conf, $fh, $json);
 

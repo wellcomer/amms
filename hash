@@ -18,9 +18,6 @@
 use strict;
 use feature qw(say);
 
-use utf8;
-use open qw(:std :utf8);
-
 use lib "/usr/lib/amms";
 use AMMS::Lib qw(xs xb);
 use AMMS::Client;

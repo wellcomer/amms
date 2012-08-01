@@ -25,11 +25,14 @@ use FCGI;
 use FCGI::ProcManager qw(pm_manage pm_pre_dispatch pm_post_dispatch);
 use Daemon::Generic;
 use URI::Escape;
-use Data::Dumper;
 
-our $VERSION = "0.2";
-our $DEBUG = 1;
 our $NAME = "hashd";
+our $VERSION = "0.2";
+our $DEBUG = 0;
+
+if ($DEBUG){
+    use Data::Dumper;
+}
 
 my ($conf, $json, $fh);
 
