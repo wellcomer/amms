@@ -88,7 +88,7 @@ case "$1" in
 
 	restart|force-reload)
 
-                $AMMSPATH/ammsd testconfig || exit $?
+                $AMMSPATH/ammsd -c $CONF check || exit $?
 
 		case "$2" in
 			ammsd)
