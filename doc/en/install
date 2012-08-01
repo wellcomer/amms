@@ -41,10 +41,10 @@
 
   Dependencies:
 
-  perl -MCPAN -e "install HTTP :: Lite"
-  perl -MCPAN -e "install Daemon :: Generic"
+  perl -MCPAN -e "install HTTP::Lite"
+  perl -MCPAN -e "install Daemon::Generic"
 
-  packages from the repository, Debian / Ubuntu:
+  packages from the repository, Debian/Ubuntu:
 
   libexporter-tidy-perl
   libconfig-general-perl
