@@ -72,6 +72,9 @@ sub fdate { # format input date for grep
     if ($input =~ /to*d*a*y*/i){
         $input = substr (ts (time), 0, 8); # only date
     }
+    elsif ($input =~ /ye*s*t*e*r*d*a*y*/i){
+        $input = substr (ts (time-86400), 0, 8);
+    }
 
     ($date, $time) = split (/\s+/, $input, 2);
 
