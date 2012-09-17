@@ -22,7 +22,7 @@ sub conf {
     $file ||= "/etc/amms/amms.conf";
 
     unless (exists $conf {$file}){
-        %{$conf{$file}} = Config::General::ParseConfig (-ConfigFile => $file, -InterPolateVars => 1);
+        %{$conf{$file}} = Config::General::ParseConfig (-ConfigFile => $file, -InterPolateVars => 1, -AutoTrue => 1);
     }
     return $conf {$file};
 }
