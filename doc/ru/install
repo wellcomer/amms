@@ -1,87 +1,115 @@
+ AMMS 1.9
+
+ Требования:
+
+    perl + модули
+    nginx или apache2 (желательно nginx)
+    squid (2.x, 3.x)
+ 
  Установка AMMS из GIT:
 
  Перейдите в целевой каталог установки (может быть произвольным), к примеру:
 
- cd /home/user
- git clone git://github.com/wellcomer/amms.git
+     cd /home/user
+     git clone git://github.com/wellcomer/amms.git
+
+     (примечание) для дальнейших обновлений используйте команду: git pull
 
  создайте символическую ссылку:
 
- ln -s /home/user/amms /usr/lib/amms
+     ln -s /home/user/amms /usr/lib/amms
 
  Создайте каталог для хранения данных и установите его владельцем пользователя nobody:
 
- mkdir /var/lib/amms
- chown nobody /var/lib/amms
+     mkdir -p /var/lib/amms/.amms
+     touch /var/lib/amms/.amms/limit
+     touch /var/lib/amms/.amms/traf
+     touch /var/lib/amms/.amms/uri
+     chown -R nobody /var/lib/amms
 
  Создайте каталог для pid файлов:
 
- mkdir /var/run/amms
+     mkdir /var/run/amms
 
  Создайте каталог для файлов конфигурации:
 
- mkdir /etc/amms
+     mkdir /etc/amms
 
  Скопируйте конфигурационные файлы из conf в /etc/amms/
  и отредактируйте их под свои нужды.
 
- cp -a /home/user/amms/conf/* /etc/amms/
+     cp -a /home/user/amms/conf/* /etc/amms/
 
- Отредактируйте конфигурационный файл nginx.conf:
+ Если установлен Nginx:
 
- В конец секции http {} добавьте строку:
+     Отредактируйте конфигурационный файл nginx.conf:
+     В конец секции http {} добавьте строку:
 
- include /etc/amms/nginx.conf;
+     include /etc/amms/nginx.conf;
 
- Перезапустите nginx.
+     Перезапустите nginx.
+
+ Если установлен Apache2:
+
+     Отредактируйте конфигурационный файл apache2.conf:
+     В конец файла добавьте строку:
+
+     Include /etc/amms/apache2.conf
+
+     Установите и активируйте модули:
+
+     mod_fastcgi
+     mod_headers
+
+     Перезапустите apache2.
 
  Скопируйте в $PATH ammsc_wrapper и переименуйте его в ammsc.
 
  Интеграция со SQUID:
 
- url_rewrite_program /usr/lib/amms/ammsrd
+     url_rewrite_program /usr/lib/amms/ammsrd
 
  Зависимости:
 
- perl -MCPAN -e "install HTTP::Lite"
- perl -MCPAN -e "install Daemon::Generic"
+     perl -MCPAN -e "install HTTP::Lite"
+     perl -MCPAN -e "install Daemon::Generic"
 
  для дистрибутивов Debian/Ubuntu:
 
- libexporter-tidy-perl
- libconfig-general-perl
- libjson-xs-perl
- libfcgi-perl
- libfcgi-procmanager-perl
- libipc-run-perl
- libfile-tail-perl
- libfile-which-perl
- libdevel-size-perl
+     libexporter-tidy-perl
+     libconfig-general-perl
+     libjson-xs-perl
+     libfcgi-perl
+     libfcgi-procmanager-perl
+     libipc-run-perl
+     libfile-tail-perl
+     libfile-which-perl
+     libdevel-size-perl
 
  Для других дистрибутивов:
 
- perl -MCPAN -e "install Exporter::Tidy
- perl -MCPAN -e "install Config::General"
- perl -MCPAN -e "install JSON::XS"
- perl -MCPAN -e "install FCGI"
- perl -MCPAN -e "install FCGI::ProcManager"
- perl -MCPAN -e "install IPC::Run"
- perl -MCPAN -e "install File::Tail"
- perl -MCPAN -e "install File::Which"
- perl -MCPAN -e "install Devel::Size"
+     perl -MCPAN -e "install Exporter::Tidy
+     perl -MCPAN -e "install Config::General"
+     perl -MCPAN -e "install JSON::XS"
+     perl -MCPAN -e "install FCGI"
+     perl -MCPAN -e "install FCGI::ProcManager"
+     perl -MCPAN -e "install IPC::Run"
+     perl -MCPAN -e "install File::Tail"
+     perl -MCPAN -e "install File::Which"
+     perl -MCPAN -e "install Devel::Size"
 
  Запуск:
 
- /etc/amms/amms start
+     /etc/amms/amms start
  
  Остановка:
  
- /etc/amms/amms stop
+     /etc/amms/amms stop
 
  Debian:
 
- mv /etc/amms/amms /etc/init.d
- insserv amms
+     mv /etc/amms/amms /etc/init.d
+     insserv amms
 
- Далее штатными средствами: invoke-rc.d amms (start|stop|restart|status)
+     Далее штатными средствами: invoke-rc.d amms (start|stop|restart|status)
  
