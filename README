@@ -10,3 +10,4 @@ Features
     * Extensions can be written in any programming language.
     * Distributed Network Architecture (slight scaling and fault tolerance).
     * No SQL.
+    * JSON API.
