@@ -244,12 +244,12 @@ sub add_limit {
         return {s=>"ERR bad param"};
     }
 
-    # save description if exists
+    # check if the limit exists
 
     my $limit = xb get_limit {type=>$type, ident=>$ident};
 
-    if ($limit){ # save description if exists
-        $req->{desc} = $limit->{desc};
+    if ($limit){ 
+        $req->{desc} = $limit->{desc};# save description
     }
 
     delete $req->{type};
@@ -257,8 +257,13 @@ sub add_limit {
 
     $json->{limit}{$type}{$ident} = $req;
 
-    mkdir (locate ($ident));
+    if ($limit){
+        return {s=>"OK"};
+    }
+    
+    # mkdir for data and set now() timestamp for a new limit 
 
+    mkdir (locate ($ident));
     return update_limit_ts ({type=>$type, ident=>$ident, period=>$req->{period}});
 }
 
