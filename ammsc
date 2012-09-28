@@ -240,11 +240,11 @@ sub limit {
         }
 
         say xs $ammsc->exe ("add_limit", $limit);
-        $ammsc->exe ("update_limit_ts", {type=>$limit->{type}, ident=>$limit->{ident}, period=>$period}) if $period;
         return;
     }
     elsif ($value =~ /^ov*e*r*/){
         if ($period eq "no"){
+            die "No overlimit found" if ($type ne $type{temp}); 
             limit ($ident, "no");
             return;
         }
