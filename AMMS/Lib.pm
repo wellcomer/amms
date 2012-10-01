@@ -70,10 +70,11 @@ sub fdate { # format input date for grep
     my ($date, $time);
 
     if ($input =~ /to*d*a*y*/i){
-        $input = substr (ts (time), 0, 8); # only date
+        $input = substr (ts (time), 0, 8); # date only
     }
-    elsif ($input =~ /ye*s*t*e*r*d*a*y*/i){
-        $input = substr (ts (time-86400), 0, 8);
+    elsif ($input =~ /(y+)e*s*t*e*r*d*a*y*/i){ # yyyyesterday 
+        my $days_before = length ($1);
+        $input = substr (ts (time - $days_before * 86400), 0, 8);
     }
 
     ($date, $time) = split (/\s+/, $input, 2);
