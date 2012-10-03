@@ -125,6 +125,9 @@ sub run_extension {
     my ($name, $arg) = ($req->{name}, $req->{arg});
 
     my $ext = $conf->{extension}{$name};
+    
+    return {s=>"ERR undefined extension name"} unless ($ext);
+
     my @arg_from_conf;
 
     ($ext, @arg_from_conf) = split (/\s+/, $ext);
@@ -133,7 +136,7 @@ sub run_extension {
 
     push @cmd, $ext;
     push @cmd, @arg_from_conf;
-    push @cmd, @$arg;
+    push @cmd, @$arg if ($arg);
 
     run (\@cmd, \$in, \$out, \$err, timeout ($conf->{$NAME}{timeout})) or return {s=>"ERR $err"};
 
