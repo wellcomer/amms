@@ -106,7 +106,7 @@ sub gd_run {
         $res->{s} = "ERR $@" if ($@);
 
         if ($res){        
-            print enc ($res);
+            print enc ($res, "preserve_utf8");
         }
         pm_post_dispatch ();
     }

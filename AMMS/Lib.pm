@@ -109,7 +109,7 @@ sub runas {
     my %res;
 
     if (POSIX::setgid ($pwn->gid)){
-        $res {gid} = $pwn->gid;
+        $res {gid} = $pwn->gid
     }
     if (POSIX::setuid ($pwn->uid)){
         $res {uid} = $pwn->uid;
@@ -118,11 +118,13 @@ sub runas {
 }
 
 sub enc {
-    return JSON::XS->new->pretty(1)->ascii(1)->encode ($_[0]);
+    my ($hash, $preserve_utf8) = @_;
+    return JSON::XS->new->pretty(1)->ascii(!$preserve_utf8)->encode ($hash); # invert flag for preserve utf8 string for external mods or programs
 }
 
 sub dec {
-    return JSON::XS->new->utf8(1)->decode ($_[0]);
+    my $json = shift;
+    return JSON::XS->new->utf8(1)->decode ($json);
 }
 
 sub encf {
