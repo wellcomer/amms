@@ -265,9 +265,8 @@ sub limit {
        $limit->{period} = $period if defined $period;
     }
 
-    if ($limit->{parent}){ # inherit value, period from parent
-        delete $limit->{value};
-        delete $limit->{period};
+    if ($limit->{parent}){ # remove parent inheritance if values of limit changed
+        delete $limit->{parent};
     }
 
     say xs $ammsc->exe ("add_limit", $limit);
