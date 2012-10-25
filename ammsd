@@ -65,6 +65,8 @@ sub gd_preconfig {
     $json->{traf} = decf ($fh->{traf});
     $json->{uri} = decf ($fh->{uri});
     
+    mkdir ($conf->{pid_base}, 0755);
+
     return ();
 }
 

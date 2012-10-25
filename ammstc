@@ -48,6 +48,8 @@ sub gd_preconfig {
     my ($self) = @_;
     
     $conf = conf ($self->{configfile});
+    mkdir ($conf->{pid_base}, 0755);
+
     return ();
 }
                                 

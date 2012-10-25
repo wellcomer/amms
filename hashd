@@ -49,6 +49,8 @@ sub gd_preconfig {
     
     open ($fh, "+<", $conf->{hashd}{file}) or die "$! " . $conf->{hashd}{file};
     $json = decf ($fh);
+
+    mkdir ($conf->{pid_base}, 0755);
     
     return ();
 }
