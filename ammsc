@@ -73,7 +73,7 @@ sub cword { # complete word
     my $word;
 
     for my $wrd (@$word_list){
-        if ($wrd =~ /^$word_part/){
+        if ($wrd =~ /^$word_part/i){
             return undef if ($word);
             $word = $wrd;
         }
@@ -313,7 +313,7 @@ sub status {
                 $l->{value} = "-";
             }
 
-            next if (!$traf->{$l->{ident}}[0] && !$traf->{$l->{ident}}[1]); # skip items with 0/0 traf
+            # next if (!$traf->{$l->{ident}}[0] && !$traf->{$l->{ident}}[1]); # skip items with 0/0 traf
 
             # type ident parent traf cached value period stat ts desc
             push @limit_sorted, sprintf ("%s %-16s %-16s %10s %10s %6s %6s %s %s %s %s",
