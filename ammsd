@@ -251,7 +251,8 @@ sub add_limit {
     my $limit = xb get_limit {type=>$type, ident=>$ident};
 
     if ($limit){ 
-        $req->{desc} = $limit->{desc};# save description
+        $req->{desc} = $limit->{desc}; # save description
+        $req->{ts} = $limit->{ts}; # save timestamp
     }
 
     delete $req->{type};
