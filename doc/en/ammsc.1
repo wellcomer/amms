@@ -1,5 +1,3 @@
-.\"Created with GNOME Manpages Editor Wizard
-.\"http://sourceforge.net/projects/gmanedit2
 .TH ammsc 1 "August 3, 2012" "1.9" "An account management system for SQUID"
 
 .SH NAME
@@ -12,7 +10,7 @@ arguments
 .br
 
 .SH DESCRIPTION
-AMMS client implements requests by HTTP protocol for limit and extensions management.
+The AMMS client implements requests by the HTTP protocol for the limit and extensions management.
 The distribution of request, authentication and other additional possibilities provides a high performance http server.
 The command is extension name or ammsc built-in command.
 The syntax supports abbreviation of commands and arguments if no conflicts with other names.
@@ -106,29 +104,40 @@ Extensions list
 .RE
 
 .B history
-ident [time]
+ident [date]
 
 .RS
- History of visited sites
+ The history of visited sites
  ident - user id
  date - date, default is today
 
  Date format (date): YYYYMM, "YYYYMMDD HHMMSS"
  t[oday] - today date
  y[esterday] - yesterday date
+ yy[esterday] - the day before yesterday
+ yyy[esterday] - two days before yesterday, and so on
+.RE
+
+.B ip
+ident [date]
+
+.RS
+ The user IP addresses for the specified period
+ ident - user id
+ date - date
 .RE
 
 .B log
 ident [count]
 
 .RS
- Tail of user log
+ The tail of user log
  ident - user id
  count - output lines count (default is 50)
 .RE
 
 .B traf
-ident date
+ident [date]
 
 .RS
  The volume of traffic used for specified period
@@ -137,7 +146,7 @@ ident date
 .RE
 
 .B uri
-ident date [detail]
+ident [date] [detail]
 
 .RS
  The volume of traffic by URL used for specified period

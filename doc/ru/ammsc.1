@@ -1,5 +1,3 @@
-.\"Created with GNOME Manpages Editor Wizard
-.\"http://sourceforge.net/projects/gmanedit2
 .TH ammsc 1 "August 3, 2012" "1.9" "An account management system for SQUID"
 
 .SH НАЗВАНИЕ
@@ -116,6 +114,17 @@ ident [date] [count]
  Формат даты (date): YYYYMMDD, "YYYYMMDD HHMMSS"
  t[oday] - сегодняшняя дата
  y[esterday] - вчерашняя дата
+ yy - позавчера
+ yyy - позапозавчера и т.д.
+.RE
+
+.B ip
+ident [date]
+
+.RS
+ IP адреса пользователя за определенную дату
+ ident - идентификатор пользователя
+ date - дата
 .RE
 
 .B log
@@ -137,7 +146,7 @@ ident date
 .RE
 
 .B uri
-ident time [detail]
+ident date [detail]
 
 .RS
  Объем трафика пользователя по URL за временной период
