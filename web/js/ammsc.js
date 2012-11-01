@@ -1,0 +1,37 @@
+/* AMMS client (C) 2012 */
+/* require jquery, jquery.json */
+
+var amms = {
+
+    exe: function (uri, data){
+
+        if (uri == null)
+            return undefined;
+        
+        data = $.toJSON (data);
+
+        var jqxhr = $.ajax ({
+            type: "POST",
+            async: false,
+            url: uri,
+            data: { q: data }
+        });
+        
+        var amms_response;
+        
+        if (jqxhr.status == 200)
+            amms_response = $.parseJSON (jqxhr.responseText);
+
+        if (amms_response == null){
+            amms_response = { b: undefined, s: undefined };
+        }
+
+        return { 
+            responseText: jqxhr.responseText,
+            status: jqxhr.status,
+            statusText: jqxhr.statusText,
+            b: amms_response.b,
+            s: amms_response.s
+        };
+    }
+};

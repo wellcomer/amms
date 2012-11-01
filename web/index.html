@@ -1,0 +1,373 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<script type="text/javascript" src="js/jquery-1.7.2.min.js"></script>
+<script type="text/javascript" src="js/jquery.dataTables.min.js"></script>
+<script src="js/jquery-ui-1.8.22.custom.min.js" type="text/javascript"></script>
+<script src="js/jquery.ui.datepicker-ru.js" type="text/javascript"></script>
+<script src="js/jquery.contextMenu.js" type="text/javascript"></script>
+<script src="js/jquery.json-2.3.min.js" type="text/javascript"></script>
+<script src="js/ammsc.js" type="text/javascript"></script>
+
+<link type="text/css" href="css/smoothness/jquery-ui-1.8.22.custom.css" rel="stylesheet">
+<link rel="stylesheet" href="css/jquery.dataTables.css" media="screen" type="text/css">
+<link type="text/css" href="css/jquery.contextMenu.css" rel="stylesheet">
+
+<style type="text/css">
+    html { width: 100%; height: 100%; }
+    body { margin: 0; font-family: sans-serif; }
+    span { border: dotted 0px; }
+    #container { width: 100%; }
+    #canvas { position: relative; top: 50px; left: 10%; right: 10%; width: 80%; overflow: hidden; }
+    #hleft { float: left; font-size: xx-large; }
+    #hright  { float: right; font-size: xx-large; text-transform: uppercase; color: gray; }
+    #back { float: right; cursor: pointer; font-size: xx-large; display: none; }
+    #head { height: 7%; background-color: gray; }
+    #action { font-size: x-large; font-variant: small-caps; } 
+    #error_text { background-color: #ea9090; border: solid 3px; border-color: #994d53; padding: 5px; font-size: x-large; }
+    #result { font-family: monospace; white-space: pre; float: left; width: 100%; }
+    #result_text { background-color: #f0f0f0; border-top: solid 3px; border-bottom: solid 3px; border-color: gray; padding: 5px }
+    #error, #result { display: none; }
+    .wrap input { display: block; }
+    .wrap label { float: right; }
+    .dialog { display: none; float: right; }
+    .align_right { text-align: right; }
+    .value_default { color: gray; }
+    .value_new { color: black; }
+</style>
+
+<script type="text/javascript">
+
+$(document).ready (function (){
+
+    oTable = $('#stat').dataTable ({"bJQueryUI": false,
+        "sPaginationType": "full_numbers",
+        "iDisplayLength": 25,
+        "bAutoWidth": false,
+        "aoColumns": [
+            {"sWidth": "1%"},
+            {"sWidth": "15%"},
+            {"sWidth": "10%"},
+            {"sClass": "align_right" },
+            {"sClass": "align_right" },
+            {"sClass": "align_right" },
+            {"sClass": "align_right", "sWidth": "1%"},
+            {"sClass": "align_right", "sWidth": "1%"},
+            {"sWidth": "10%"},
+            null,
+            {"sWidth": "15%"}
+    ]});
+
+    $("#date_text").datepicker ({ dateFormat: "yymmdd" }); // calendar 
+
+    $("#tbody1").contextMenu({
+        menu: 'myMenu'
+    },
+    function(action, el, pos) { // menu handler
+       
+       cur_action = action;
+
+       var elem = document.elementFromPoint (pos.docX, pos.docY);
+
+       ltype  = elem.parentNode.childNodes[0].childNodes[0].nodeValue;
+       ident  = elem.parentNode.childNodes[1].childNodes[0].nodeValue;
+       limit  = elem.parentNode.childNodes[5].childNodes[0].nodeValue;
+       period = elem.parentNode.childNodes[6].childNodes[0].nodeValue;
+
+       $ ("#hright").text (action + " " + ident);
+       $ ("#back").show ();
+       $ ("#head").show ();
+       //$ ("#action").text (action);
+       $ ("#stat_container").hide ();
+       
+       refresh = 0; // start page refresh flag
+
+       switch (action){
+           case "new":
+              $ ("#hright").text (action + " limit");
+              ident = limit = period = "";
+           case "edit":
+              $ ("#edit").show ();
+              $ ("#ltype").val (ltype);
+              $ ("#ident").val (ident);
+              $ ("#limit").val (limit);
+              $ ("#period").val (period);
+              break;
+           case "over":
+           case "rename":
+           case "parent":
+           case "state":
+           case "desc":
+              $ ("#value").show ();
+              break;
+           case "history":
+           case "ip":
+           case "traf":
+           case "uri":
+              $ ("#date").show ();
+              break;
+           case "log":
+              $ (".accept").click ();
+              break;
+           case "remove":
+              $ ("#hright").text (action + " " + ident + " (" + ltype + ")");
+              $ ("#remove").show ();
+       }
+       //alert('you selected element id: ' + elem.parentNode.getAttribute ('id'));
+    });
+
+    $ ("#back").on ("click", function(e){ // back arrow click
+        if (refresh){
+            document.location.reload (true);
+            return;
+        }
+        $ (".dialog").hide ();
+        $ ("#back").hide ();
+        $ ("#error").hide ();
+        $ ("#result").hide ();
+        $ ("#hright").text ("stat");
+        $ ("#stat_container").show ();
+    });
+
+    $ ("#date_text, #value_text").keydown (function(event) {
+        if (event.keyCode == '13') 
+            $ (".accept").trigger ($.Event ("click"));
+    });
+ 
+    $ (".accept").on ("click", function(e){ // accept button handler
+        switch (cur_action){
+            case "new":
+            case "edit":                
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["limit", $("#ident").val(), $("#limit").val(), $("#period").val(), $("#ltype option:selected").val ()]});
+                refresh = 1;
+                break;
+            case "over":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["limit", ident, "over", $("#value_text").val()]});
+                refresh = 1;
+                break;
+            case "rename":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["limit", ident, "rename", $("#value_text").val()]});
+                refresh = 1;
+                break;
+            case "parent":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["limit", ident, "parent", $("#value_text").val()]});
+                refresh = 1;
+                break;
+            case "state":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["limit", ident, "state", $("#value_text").val()]});
+                refresh = 1;
+                break;
+            case "desc":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["limit", ident, "desc", $("#value_text").val()]});
+                refresh = 1;
+                break;
+            case "history":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["history", ident, $("#date_text").val()]});
+                break;
+            case "ip":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["ip", ident, $("#date_text").val()]});
+                break;
+            case "traf":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["traf", ident, $("#date_text").val()]});
+                break;
+            case "uri":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["uri", ident, $("#date_text").val()]});
+                break;
+            case "log":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["log", ident, 45]});
+                break;
+            case "remove":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["limit", ident, "no"]});
+                refresh = 1;
+        }
+        if (res.status != 200){ // show error
+            $ ("#stat_container").hide ();
+            $ ("#error").show ();
+            $ ("#error_text").text (res.status + " " + res.statusText);
+        }
+        else {
+            $ ("#result").show ();
+            if (res.b == "")
+                res.b = "EMPTY";
+            $ ("#result_text").text (res.b);
+        }
+    });
+ 
+    ammsd_uri = "http://127.0.0.1:81/ammsd.fcgi";
+    res = amms.exe (ammsd_uri, {f:"get_extension_runner"});
+
+    if (res.status != 200){ // show error
+        $ ("#stat_container").hide ();
+        $ ("#error").show ();
+        $ ("#error_text").text (res.status + " " + res.statusText);
+    }
+    else { // stat
+        
+        ammsed_uri = res.b;
+        res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc", arg:["stat"]}); // call ammsc stat
+        
+        var rows = res.b.split ("\n");
+        var i, items = [];
+
+        for (i=0; i < rows.length; i++){
+            item = rows[i].split (/\s+/, 12);
+            if (item.length == 1) // skip empty
+                continue;
+            items[i] = item;
+        }
+        if (items.length)
+            $ ("#stat").dataTable().fnAddData (items);
+    }
+});
+
+</script>
+
+</head>
+<body>
+
+<ul id="myMenu" class="contextMenu">
+    <li class="new"> <a href="#new">New...</a> </li>
+    <li class="edit"> <a href="#edit">Edit...</a> </li>
+    <li class="over"> <a href="#over">Over...</a> </li>
+    <li class="rename"> <a href="#rename">Rename...</a> </li>
+    <li class="parent"> <a href="#parent">Parent...</a> </li>
+    <li class="state"> <a href="#state">State...</a> </li>
+    <li class="desc"> <a href="#desc">Desc...</a> </li>
+    <li class="bind separator"> <!--<a href="#bind">bind</a> yet not implemented for this interface--> </li>
+    <li class="history"> <a href="#history">history</a> </li>
+    <li class="ip"> <a href="#ip">ip</a> </li>
+    <li class="log"> <a href="#log">log</a> </li>
+    <li class="traf"> <a href="#traf">traf</a> </li>
+    <li class="uri"> <a href="#uri">uri</a> </li>
+    <li class="remove separator"> <a href="#remove">Remove</a> </li>
+</ul>
+
+<div id="container">
+    <div id="canvas">
+        <span id="hleft">AMMS</span> <!--left header-->
+        <span id="hright">stat</span> <!--right header-->
+        <span id="back"><b>&nbsp;&nbsp;&larr;&nbsp;&nbsp;</b></span> <!--back arrow-->
+        <br><br>
+        <div style="height: 7%; background-color: none">&nbsp;</div> <!--separator-->
+        <!--<div id="head" class="dialog"> <span id="action"></span> </div>-->
+
+        <!--STAT-->
+
+        <div id="stat_container">
+        <table id="stat">
+            <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Ident</th>
+                        <th>Parent</th>
+                        <th>Value</th>
+                        <th>Cached</th>
+                        <th>Limit</th>
+                        <th>Period</th>
+                        <th>State</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Desc</th>
+                    </tr>
+           </thead>
+            <tbody id="tbody1"> </tbody>
+         </table>
+         </div>
+
+         <!--Dialog forms-->
+         <!--EDIT-->
+
+         <div id="edit" class="dialog">
+            <table>
+                <tr>
+                    <td>Ident</td>
+                    <td>Limit</td>
+                    <td>Period</td>
+                    <td colspan="2">Type</td>
+                </tr>
+                <tr>
+                    <td><input type="text" id="ident"></td>
+                    <td><input type="text" id="limit"></td>
+                    <td><input type="text" id="period"></td>
+                    <td><select id="ltype"> <option value="I">Ident</option> <option value="T">Temp</option> <option value="P">Parent</option> </select></td>
+                    <td><input type="button" value="Accept" class="accept"></td>
+                </tr>
+            </table>
+         </div>
+
+         <!--VALUE-->
+
+         <div id="value" class="dialog">
+            <table>
+                <tr>
+                    <td colspan="2">Value</td>
+                </tr>
+                <tr>
+                    <td><input type="text" id="value_text"></td>
+                    <td><input type="button" value="Accept" class="accept"></td>
+                </tr>
+            </table>
+         </div>
+
+         <!--DATE-->
+
+         <div id="date" class="dialog">
+            <table>
+                <tr>
+                    <td colspan="2">Date</td>
+                </tr>
+                <tr>
+                    <td><input type="text" id="date_text" value="today" class="value_default"></td>
+                    <td><input type="button" value="Accept" class="accept"></td>
+                </tr>
+            </table>
+         </div>
+
+         <!--REMOVE-->
+
+         <div id="remove" class="dialog">
+            <table>
+                <tr>
+                    <td><input type="button" value="Accept" class="accept"></td>
+                </tr>
+            </table>
+        </div>
+
+         <!--ERROR-->
+
+         <div id="error">
+            <table width="100%">
+                <tr>
+                    <td id="error_text">EMPTY</td>
+                </tr>
+            </table>
+         </div>
+
+         <!--RESULT-->
+
+         <div id="result">
+             <table width="100%">
+                <tr>
+                    <td id="result_text">EMPTY</td>
+                </tr>
+            </table>
+         </div>
+
+
+    </div>
+</div>
+</body>
+</html>
