@@ -6,6 +6,7 @@ Features
     * Do not change SQUID config file by changing the parameters of access.
     * No need to restart the SQUID when changing account preferences.
     * Command line interface.
+    * Web inteface.
     * Event-driven (in excess of the limit, off limits, etc.).
     * Extensions can be written in any programming language.
     * Distributed Network Architecture (slight scaling and fault tolerance).
