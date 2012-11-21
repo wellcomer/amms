@@ -39,7 +39,7 @@ if ($DEBUG){
     use Data::Dumper;
 }
 
-my ($conf, $fh, $json);
+my ($conf, $fh, $json, $perf);
 
 newdaemon (
     pidfile  => locate_pid ("$NAME.pid"),
@@ -64,6 +64,8 @@ sub gd_preconfig {
     $json->{limit} = decf ($fh->{limit});
     $json->{traf} = decf ($fh->{traf});
     $json->{uri} = decf ($fh->{uri});
+
+    $perf->{starttime} = $perf->{msmtime} = time;
     
     mkdir ($conf->{pid_base}, 0755);
 
@@ -90,17 +92,34 @@ sub gd_run {
     
     $0 = $NAME;
 
-    my ($req, $sub, $res);
+    my ($req, $sub, $res, $time);
 
     while ($request->Accept() >= 0) {
 
         pm_pre_dispatch ();
-        
+
         print "Content-Type: text/plain\n\n";
 
         $req = do { local $/; <STDIN> };
 
         if ($req){
+
+            $perf->{rcount}++; # total requests count
+            $perf->{in} += length ($req); # bytes in
+
+            $time = time;
+            
+            if ($perf->{rpsmax}{time} != $time){
+                if ($perf->{rpsmax}{val} > $perf->{rpsmax}{maxval}){
+                    $perf->{rpsmax}{maxval} = $perf->{rpsmax}{val}; # max requests per second
+                    $perf->{rpsmax}{maxtime} = $time; # peak time
+                }
+                $perf->{rpsmax}{time} = $time;
+                $perf->{rpsmax}{val} = 0;
+            }
+
+            $perf->{rpsmax}{val}++;
+
             $req = substr ($req, 2); # skip q=
             $req = uri_unescape ($req);
             $req = dec ($req);
@@ -121,7 +140,9 @@ sub gd_run {
         $res->{s} = "ERR $@" if ($@);
 
         if ($res){        
-            print enc ($res);
+            $res = enc ($res);
+            $perf->{out} += length ($res); # bytes out
+            print $res;
         }
         pm_post_dispatch ();
     }
@@ -469,6 +490,19 @@ sub get_uri {
         return {s=>"ERR not found"};
     }
     return {s=>"OK", b=>$uri};
+}
+
+sub get_perf {
+
+    return {s=>"OK",b=>$perf};
+}
+
+sub reset_perf {
+
+    $perf->{rcount} = $perf->{in} = $perf->{out} = 0;
+    $perf->{msmtime} = time;
+
+    return {s=>"OK"};
 }
 
 sub check_access {

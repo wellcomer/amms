@@ -13,7 +13,7 @@ arguments
 The AMMS client implements requests by the HTTP protocol for the limit and extensions management.
 The distribution of request, authentication and other additional possibilities provides a high performance http server.
 The command is extension name or ammsc built-in command.
-The syntax supports abbreviation of commands and arguments if no conflicts with other names.
+The syntax supports cisco-like abbreviation of commands and arguments if no conflicts with other names.
 
 .SH Built-in commands
 .B limit
@@ -77,6 +77,7 @@ ident
 
 .RS
 The volume of traffic used for the period of the limit
+
 ident - user id, default - all users
 
 Output format:
@@ -96,6 +97,7 @@ Extensions list
 
 .RS
  Bind login to the specified IP, logins from other IPs disabled.
+
  ls - view
  set - link ident to ip
  rem num - remove record with number num
@@ -108,6 +110,7 @@ ident [date]
 
 .RS
  The history of visited sites
+
  ident - user id
  date - date, default is today
 
@@ -123,6 +126,7 @@ ident [date]
 
 .RS
  The user IP addresses for the specified period
+ 
  ident - user id
  date - date
 .RE
@@ -132,8 +136,26 @@ ident [count]
 
 .RS
  The tail of user log
+ 
  ident - user id
  count - output lines count (default is 50)
+.RE
+
+.B perf
+[reset]
+
+.RS
+ Performance and other info about the running ammsd
+ 
+ rpsmax  - max count of requests per second
+ rpsavg  - average count of requests per second 
+ rcount  - total count of requests
+ in      - bytes in
+ out     - bytes out
+ msmtime - measurement time (the time format is: dd:hh:mm:ss)
+ dbsize  - size of the amms data (bytes)
+ lcount  - the count of the limits
+ uptime  - ammsd uptime (the time format is the same as in msmtime)
 .RE
 
 .B traf
@@ -141,6 +163,7 @@ ident [date]
 
 .RS
  The volume of traffic used for specified period
+ 
  ident - user id, default - all users
  date - date
 .RE
@@ -150,6 +173,7 @@ ident [date] [detail]
 
 .RS
  The volume of traffic by URL used for specified period
+ 
  ident - user id
  date - date
  detail - detailed information

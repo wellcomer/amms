@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+
+# Performance and other info about the running ammsd
+# 
+# rpsmax  - max count of requests per second
+# rpsavg  - average count of requests per second 
+# rcount  - total count of requests
+# in      - bytes in
+# out     - bytes out
+# msmtime - measurement time (the time format is: dd:hh:mm:ss)
+# dbsize  - size of the amms data (bytes)
+# lcount  - the count of the limits
+# uptime  - ammsd uptime (the time format is the same as in msmtime)
+
+use strict;
+
+use lib "/usr/lib/amms/";
+use AMMS::Lib qw(:all);
+use AMMS::Client;
+use File::Which;
+
+my ($ammsd_uri, $amms_dat, $do) = @ARGV;
+
+die "No ammsd_uri" unless $ammsd_uri;
+die "No amms_dat"  unless $amms_dat;
+
+my $ammsc = AMMS::Client->new;
+
+unless ($ammsc->connect ($ammsd_uri)){
+    die "Can't connect to amms daemon";
+}
+
+if ($do =~ /re*s*e*t*/i){
+    printf ("%s\n", xs $ammsc->exe ("reset_perf"));
+    exit;
+}
+
+my $perf = xb $ammsc->exe ("get_perf");
+
+sub dhms {
+    
+    my $sec = shift;
+    
+    my $day = int ($sec / 86400);
+    $sec = $sec % 86400;
+
+    my $hrs = int ($sec / 3600);
+    $sec = $sec % 3600;
+
+    my $min = int ($sec / 60);
+    $sec = $sec % 60;
+
+    return sprintf ("%.2d:%.2d:%.2d:%.2d", $day, $hrs, $min, $sec);
+}
+
+my $now = time;
+
+my $msmtime = $now - $perf->{msmtime};
+my $uptime  = $now - $perf->{starttime};
+my $rpsmax  = $perf->{rpsmax}{maxval};
+my $rpsavg  = $perf->{rcount} / $msmtime;
+
+my $du = which ("du");
+my ($dbsize) = split (/\s+/, `$du -sbL $amms_dat`, 1);
+
+my $ls = which ("ls");
+my $lcount = split (/\n/, `$ls -1 $amms_dat`);
+
+printf ("rpsmax %d rpsavg %.2f rcount %d in %d out %d msmtime %s / dbsize %d lcount %d uptime %s\n",
+	$rpsmax,
+        $rpsavg,
+        $perf->{rcount},
+        $perf->{in},
+        $perf->{out},
+        dhms ($msmtime),
+        $dbsize,
+        $lcount,
+        dhms ($uptime)
+);
+
