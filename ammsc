@@ -21,6 +21,7 @@ use feature qw(say);
 use lib "/usr/lib/amms";
 use AMMS::Lib qw(:all);
 use AMMS::Client;
+use Encode;
 
 my $VERSION = 0.2;
 
@@ -60,7 +61,7 @@ else { # run extension
     $ammsc->connect ($uri) || die "Can't connect to extension runner URI: $uri";
     $res = $ammsc->exe ("run_extension", {name=>$action, arg=>\@argv});
     die $res->{s} if ($res->{s} =~ /^ERR/);
-    print xb $res;
+    print encode ("utf8", xb ($res));
 }
 
 sub cword { # complete word
