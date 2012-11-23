@@ -220,7 +220,6 @@ $(document).ready (function (){
         }
     });
  
-    ammsd_uri = "http://127.0.0.1:81/ammsd.fcgi";
     res = amms.exe (ammsd_uri, {f:"get_extension_runner"});
 
     if (res.status != 200){ // show error
