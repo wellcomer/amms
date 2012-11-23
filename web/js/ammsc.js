@@ -1,6 +1,8 @@
 /* AMMS client (C) 2012 */
 /* require jquery, jquery.json */
 
+ammsd_uri = "http://127.0.0.1:81/ammsd.fcgi";
+
 var amms = {
 
     exe: function (uri, data){
