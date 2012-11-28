@@ -10,6 +10,7 @@
 <script src="js/jquery.ui.datepicker-ru.js" type="text/javascript"></script>
 <script src="js/jquery.contextMenu.js" type="text/javascript"></script>
 <script src="js/jquery.json-2.3.min.js" type="text/javascript"></script>
+<script src="js/jquery.hotkeys.js" type="text/javascript"></script>
 <script src="js/ammsc.js" type="text/javascript"></script>
 
 <link type="text/css" href="css/smoothness/jquery-ui-1.8.22.custom.css" rel="stylesheet">
@@ -72,6 +73,15 @@ $(document).ready (function (){
             else if (aData[7] == 2) // state disabled
                 $("td", nRow).addClass ("state_dis");
         }
+    });
+
+    // keyboard navigation
+
+    $(document).bind("keydown", "ctrl+left", function (){ // ctrl+left prev page
+        oTable.fnPageChange ("previous");
+    });
+    $(document).bind("keydown", "ctrl+right", function (){ // ctrl+right next page
+        oTable.fnPageChange ("next");
     });
 
     $("#date_text").datepicker ({ dateFormat: "yymmdd" }); // calendar 
