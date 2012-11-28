@@ -10,14 +10,9 @@ var amms = {
         if (uri == null)
             return undefined;
         
-        data = $.toJSON (data);
+        data = "q=" + encodeURIComponent ($.toJSON (data)); // manually encode to prevent "+" sign
 
-        var jqxhr = $.ajax ({
-            type: "POST",
-            async: false,
-            url: uri,
-            data: { q: data }
-        });
+        var jqxhr = $.ajax ({type: "POST", async: false, url: uri, data: data});
         
         var amms_response;
         

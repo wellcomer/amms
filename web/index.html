@@ -5,6 +5,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <script src="js/jquery-1.7.2.min.js" type="text/javascript"></script>
 <script src="js/jquery.dataTables.min.js" type="text/javascript"></script>
+<script src="js/jquery.dataTables.fnPagingInfo.js" type="text/javascript"></script>
 <script src="js/jquery-ui-1.8.22.custom.min.js" type="text/javascript"></script>
 <script src="js/jquery.ui.datepicker-ru.js" type="text/javascript"></script>
 <script src="js/jquery.contextMenu.js" type="text/javascript"></script>
@@ -63,7 +64,7 @@ $(document).ready (function (){
             null,
             {"sWidth": "15%"}
         ],
-        "fnRowCallback": function (nRow, aData, iDisplayIndex ) {
+        "fnRowCallback": function (nRow, aData, iDisplayIndex ) { // highlight items
             if (aData[5] == "0")    // unlimited access
                 $("td", nRow).addClass ("state_unl");
             if (aData[7] == "0")    // state off
@@ -131,10 +132,11 @@ $(document).ready (function (){
        //alert('you selected element id: ' + elem.parentNode.getAttribute ('id'));
     });
 
-    $ ("#back").on ("click", function(e){ // back arrow click
+    $ ("#back").on ("click", function(e){ // back arrow click, return from dialog to main table
         if (refresh){
-            document.location.reload (true);
-            return;
+            var iPage = (oTable.fnPagingInfo().iPage);
+            get_table_data ();
+            oTable.fnPageChange (iPage); // return to selected page
         }
         $ (".dialog").hide ();
         $ ("#back").hide ();
@@ -144,7 +146,7 @@ $(document).ready (function (){
         $ ("#stat_container").show ();
     });
 
-    $ ("#date_text, #value_text").keydown (function(event) {
+    $ ("#date_text, #value_text").keydown (function(event) { // handle the "press enter" event on the date/value input field
         if (event.keyCode == '13') 
             $ (".accept").trigger ($.Event ("click"));
     });
@@ -219,31 +221,39 @@ $(document).ready (function (){
             $ ("#result_text").text (res.b);
         }
     });
+
+    function get_table_data () {
  
-    res = amms.exe (ammsd_uri, {f:"get_extension_runner"});
+        var res = amms.exe (ammsd_uri, {f:"get_extension_runner"});
 
-    if (res.status != 200){ // show error
-        $ ("#stat_container").hide ();
-        $ ("#error").show ();
-        $ ("#error_text").text (res.status + " " + res.statusText);
-    }
-    else { // stat
-        
-        ammsed_uri = res.b;
-        res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc", arg:["stat"]}); // call ammsc stat
-        
-        var rows = res.b.split ("\n");
-        var i, items = [];
-
-        for (i=0; i < rows.length; i++){
-            item = rows[i].split (/\s+/, 12);
-            if (item.length == 1) // skip empty
-                continue;
-            items[i] = item;
+        if (res.status != 200){ // show error
+            $ ("#stat_container").hide ();
+            $ ("#error").show ();
+            $ ("#error_text").text (res.status + " " + res.statusText);
         }
-        if (items.length)
-            $ ("#stat").dataTable().fnAddData (items);
+        else { // stat
+        
+            ammsed_uri = res.b;
+            res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc", arg:["stat"]}); // call ammsc stat
+        
+            var rows = res.b.split ("\n");
+            var i, items = [], desc;
+
+            for (i=0; i < rows.length; i++){
+                item = rows[i].split (/\s+/);
+                if (item.length == 1) // skip empty
+                    continue;
+                item[10] = item.slice(10).join (" "); // desc with whitespaces
+                items[i] = item;
+            }
+            if (items.length){
+                oTable.fnClearTable ();
+                oTable.fnAddData (items);
+            }
+        }
     }
+
+    get_table_data ();
 });
 
 </script>
