@@ -136,8 +136,9 @@ $(document).ready (function (){
               $ (".accept").click ();
               break;
            case "remove":
+           case "reset":
               $ ("#hright").text (action + " " + ident + " (" + ltype + ")");
-              $ ("#remove").show ();
+              $ ("#accept").show ();
        }
        //alert('you selected element id: ' + elem.parentNode.getAttribute ('id'));
     });
@@ -177,6 +178,11 @@ $(document).ready (function (){
             case "rename":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", ident, "rename", $("#value_text").val()]});
+                refresh = 1;
+                break;
+            case "reset":
+                res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
+                    arg:["reset", ident]});
                 refresh = 1;
                 break;
             case "parent":
@@ -276,6 +282,7 @@ $(document).ready (function (){
     <li class="edit"> <a href="#edit">Edit...</a> </li>
     <li class="over"> <a href="#over">Over...</a> </li>
     <li class="rename"> <a href="#rename">Rename...</a> </li>
+    <li class="reset"> <a href="#reset">Reset...</a> </li>
     <li class="parent"> <a href="#parent">Parent...</a> </li>
     <li class="state"> <a href="#state">State...</a> </li>
     <li class="desc"> <a href="#desc">Desc...</a> </li>
@@ -369,9 +376,9 @@ $(document).ready (function (){
             </table>
          </div>
 
-         <!--REMOVE-->
+         <!--ACCEPT-->
 
-         <div id="remove" class="dialog">
+         <div id="accept" class="dialog">
             <table>
                 <tr>
                     <td><input type="button" value="Accept" class="accept"></td>
