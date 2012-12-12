@@ -95,10 +95,13 @@ $(document).ready (function (){
 
        var elem = document.elementFromPoint (pos.docX, pos.docY);
 
-       ltype  = elem.parentNode.childNodes[0].childNodes[0].nodeValue;
-       ident  = elem.parentNode.childNodes[1].childNodes[0].nodeValue;
-       limit  = elem.parentNode.childNodes[5].childNodes[0].nodeValue;
-       period = elem.parentNode.childNodes[6].childNodes[0].nodeValue;
+       try {
+           ltype  = elem.parentNode.childNodes[0].childNodes[0].nodeValue;
+           ident  = elem.parentNode.childNodes[1].childNodes[0].nodeValue;
+           limit  = elem.parentNode.childNodes[5].childNodes[0].nodeValue;
+           period = elem.parentNode.childNodes[6].childNodes[0].nodeValue;
+       }
+       catch (e){}
 
        $ ("#hright").text (action + " " + ident);
        $ ("#back").show ();
