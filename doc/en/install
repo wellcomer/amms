@@ -111,3 +111,15 @@
       insserv amms
 
       invoke-rc.d amms (start | stop | restart | status)
+
+  Web-interface:
+
+      To enter the web-interface, use the address $amms_url/web/,
+      in your web/js/ammsc.js set ammsd_uri = $ammsd_uri,
+      variables amms_url, ammsd_uri are in the file amms.conf
+
+      The interface on the machine without amms
+
+      Copy the web directory to the target machine, the file web/js/ammsc.js set
+      address to which is ammsd.fcgi, for example http://inet.server:81/ammsd.fcgi,
+      open index.html
