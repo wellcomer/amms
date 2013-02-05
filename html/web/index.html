@@ -66,6 +66,7 @@ $(document).ready (function (){
             {"sWidth": "15%"}
         ],
         "fnRowCallback": function (nRow, aData, iDisplayIndex ) { // highlight items
+            $(nRow).contextMenu ({menu: 'myMenu'}, menu_handler); // add menu handler to each row
             if (aData[5] == "0")    // unlimited access
                 $("td", nRow).addClass ("state_unl");
             if (aData[7] == "0")    // state off
@@ -86,20 +87,19 @@ $(document).ready (function (){
 
     $("#date_text").datepicker ({ dateFormat: "yymmdd" }); // calendar 
 
-    $("#tbody1").contextMenu({
-        menu: 'myMenu'
-    },
-    function(action, el, pos) { // menu handler
+    function menu_handler (action, el, pos) {
+
+       var wrapper = $('<div></div>');
+       wrapper.html (el[0]);
+       var element = $('td', wrapper);
        
        cur_action = action;
 
-       var elem = document.elementFromPoint (pos.docX, pos.docY);
-
        try {
-           ltype  = elem.parentNode.childNodes[0].childNodes[0].nodeValue;
-           ident  = elem.parentNode.childNodes[1].childNodes[0].nodeValue;
-           limit  = elem.parentNode.childNodes[5].childNodes[0].nodeValue;
-           period = elem.parentNode.childNodes[6].childNodes[0].nodeValue;
+           ltype  = $(element[0]).text();
+           ident  = $(element[1]).text();
+           limit  = $(element[5]).text();
+           period = $(element[6]).text();
        }
        catch (e){}
 
@@ -144,7 +144,7 @@ $(document).ready (function (){
               $ ("#accept").show ();
        }
        //alert('you selected element id: ' + elem.parentNode.getAttribute ('id'));
-    });
+    }
 
     $ ("#back").on ("click", function(e){ // back arrow click, return from dialog to main table
         if (refresh){
