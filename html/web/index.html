@@ -109,8 +109,6 @@ $(document).ready (function (){
        //$ ("#action").text (action);
        $ ("#stat_container").hide ();
        
-       refresh = 0; // the start page refresh flag
-
        switch (action){
            case "new":
               $ ("#hright").text (action + " limit");
@@ -147,11 +145,9 @@ $(document).ready (function (){
     }
 
     $ ("#back").on ("click", function(e){ // back arrow click, return from dialog to main table
-        if (refresh){
-            var iPage = (oTable.fnPagingInfo().iPage);
-            get_table_data ();
-            oTable.fnPageChange (iPage); // return to selected page
-        }
+        var iPage = (oTable.fnPagingInfo().iPage);
+        get_table_data ();
+        oTable.fnPageChange (iPage); // return to selected page
         $ (".dialog").hide ();
         $ ("#back").hide ();
         $ ("#error").hide ();
@@ -171,37 +167,30 @@ $(document).ready (function (){
             case "edit":                
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", $("#ident").val(), $("#limit").val(), $("#period").val(), $("#ltype option:selected").val ()]});
-                refresh = 1;
                 break;
             case "over":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", ident, "over", $("#value_text").val()]});
-                refresh = 1;
                 break;
             case "rename":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", ident, "rename", $("#value_text").val()]});
-                refresh = 1;
                 break;
             case "reset":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["reset", ident]});
-                refresh = 1;
                 break;
             case "parent":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", ident, "parent", $("#value_text").val()]});
-                refresh = 1;
                 break;
             case "state":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", ident, "state", $("#value_text").val()]});
-                refresh = 1;
                 break;
             case "desc":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", ident, "desc", $("#value_text").val()]});
-                refresh = 1;
                 break;
             case "history":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
@@ -226,7 +215,6 @@ $(document).ready (function (){
             case "remove":
                 res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc",
                     arg:["limit", ident, "no"]});
-                refresh = 1;
         }
         if (res.status != 200){ // show error
             $ ("#stat_container").hide ();
