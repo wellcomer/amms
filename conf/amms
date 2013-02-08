@@ -4,7 +4,7 @@
 # Provides:          amms
 # Required-Start:    $local_fs $remote_fs $network $syslog $named
 # Required-Stop:     $local_fs $remote_fs $network $syslog $named
-# Should-Start:      nginx squid
+# Should-Start:      nginx apache2 squid
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: starts the amms server
