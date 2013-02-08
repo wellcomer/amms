@@ -124,3 +124,5 @@
       Copy the web directory to the target machine, the file web/js/ammsc.js set
       address to which is ammsd.fcgi, for example http://inet.server:81/ammsd.fcgi,
       open index.html
+
+      Default username/password: amms
