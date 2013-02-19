@@ -94,10 +94,31 @@ sub gd_run {
 	sleep 5;
     }
 
-    while (<LOG>){
+    # Note: need restart ammstc when bypass file changed
+
+    my @bypass_uri_list;
+    my $bypass_uri_regex;
+
+    if (defined $conf->{$NAME}{bypass_uri_file}){
+
+        if (open (BYPASS, $conf->{$NAME}{bypass_uri_file})){
+            @bypass_uri_list = <BYPASS>;
+            chomp @bypass_uri_list;
+            close BYPASS;
+        }
+        else {
+            warn "Can't open bypass file ($!), continue";
+        }
+    }
+
+    LINE: while (<LOG>){
 
         @field = split (/\s+/);
         ($ts,$ip,$rcode,$size,$method,$uri,$ident,$mime) = @field [0,2,3,4,5,6,7,9];
+
+        for $bypass_uri_regex (@bypass_uri_list){
+            next LINE if ($bypass_uri_regex and $uri =~ /$bypass_uri_regex/i);
+        }
 
         $res = $ammsc->exe ("add_uri", {ts=>$ts, ip=>$ip, rcode=>$rcode, size=>$size,
                              method=>$method, uri=>$uri, ident=>$ident, mime=>$mime});
