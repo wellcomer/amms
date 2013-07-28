@@ -248,7 +248,14 @@ $(document).ready (function (){
         
             ammsed_uri = res.b;
             res = amms.exe (ammsed_uri, {f:"run_extension", name:"ammsc", arg:["stat"]}); // call ammsc stat
-        
+
+	    if (res.b == null){
+                 $ ("#stat_container").hide ();
+                 $ ("#error").show ();
+                 $ ("#error_text").text (res.s);
+                 return;
+            }
+
             var rows = res.b.split ("\n");
             var i, items = [], desc;
 
