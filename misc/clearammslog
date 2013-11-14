@@ -1,0 +1,5 @@
+#!/bin/sh
+# remove logs older then 12 months
+
+rempattern=`date -d "-13 month" +%Y%m`
+find /var/lib/amms -name log -exec sed -i /^$rempattern/d {} \;
