@@ -22,42 +22,64 @@ unless ($ammsc->connect ($uri)){
 }
 
 my $limit = xb $ammsc->exe ("get_anylimit", {ident => $ident});
-
 die "Not found" unless ($limit);
 
-$date ||= "today";
+my $all_limits = xb $ammsc->exe ("get_limit");
 
-my $file = locate ($ident, "uri");
+$date ||= "today";
 $date = fdate ($date);
 
 my $grep = which ("grep");
 
-my $text = `$grep $date $file`;
-my @line = split ("\n", $text);
+my (%uri, @xident);
 
-my %uri;
+if ($limit->{type} eq 'P'){
+    
+    for my $type ('T','I'){        
+        
+        $limit = $all_limits->{$type};
 
-# values from ident/uri
-
-for (@line){
-    my ($stub, $stub, $key, $size) = split;
-    $key = domain ($key) unless ($detail);
-    $uri{$key} += $size;
+        for (keys %$limit){
+            if ($limit->{$_}{parent} eq $ident){
+                push @xident, [$type, $_]; # children
+            }
+        }
+    }
+}
+else {
+    push @xident, [$limit->{type}, $limit->{ident}];
 }
 
-# values from ammsd
+for my $xident (@xident) {
 
-my $ts = ts ($limit->{ts});
-$date =~ s/"//g;
+    my ($type, $ident) = @$xident;
+    my $file = locate ($ident, "uri");
 
-if (grep (/$date/, $ts)){
-    
-    my $uri2 = xb $ammsc->exe ("get_uri", {ident => $ident});
-    
-    for my $key2 (keys %$uri2){
-        my $key = $key2;
+    my $text = `$grep $date $file`;
+    my @line = split ("\n", $text);
+
+    # values from ident/uri
+
+    for (@line){
+        my ($stub, $stub, $key, $size) = split;
         $key = domain ($key) unless ($detail);
-        $uri{$key} += $uri2->{$key2};
+        $uri{$key} += $size;
+    }
+
+    # values from ammsd
+
+    my $ts = ts ($all_limits->{$type}{$ident}{ts});
+    $date =~ s/"//g;
+
+    if (grep (/$date/, $ts)){
+        
+        my $uri2 = xb $ammsc->exe ("get_uri", {type => $type, ident => $ident});
+        
+        for my $key2 (keys %$uri2){
+            my $key = $key2;
+            $key = domain ($key) unless ($detail);
+            $uri{$key} += $uri2->{$key2};
+        }
     }
 }
 
