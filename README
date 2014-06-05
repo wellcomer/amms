@@ -3,13 +3,11 @@ AMMS (Account management for Squid)
 An account management system for Squid.
 Features
 
-    * Do not change SQUID config file by changing the parameters of access.
-    * No need to restart the SQUID when changing account preferences.
+    * Event-driven (in excess of the limit, off limits, etc.).
+    * Distributed Network Architecture (slight scaling and fault tolerance).
     * Command line interface.
     * Web interface.
-    * Event-driven (in excess of the limit, off limits, etc.).
-    * Extensions can be written in any programming language.
-    * Distributed Network Architecture (slight scaling and fault tolerance).
+    * Extensions.
     * No SQL.
     * JSON API.
 
