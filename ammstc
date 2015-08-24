@@ -120,6 +120,8 @@ sub gd_run {
             next LINE if ($bypass_uri_regex and $uri =~ /$bypass_uri_regex/i);
         }
 
+        $ident = lc $ident if ($conf->{ident_ignorecase});
+
         $res = $ammsc->exe ("add_uri", {ts=>$ts, ip=>$ip, rcode=>$rcode, size=>$size,
                              method=>$method, uri=>$uri, ident=>$ident, mime=>$mime});
 

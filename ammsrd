@@ -64,7 +64,13 @@ while (<>) {
     $ip = substr ($f [1], 0, -2);
 
     $ident = $f [2];
-    $ident = $ip if ($conf->{ammsrd}{ip_as_ident});
+
+    if ($conf->{ammsrd}{ip_as_ident}){
+        $ident = $ip;
+    }
+    else {
+        $ident = lc $ident if ($conf->{ident_ignorecase});
+    }
     
     if ($hashd){
 
