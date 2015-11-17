@@ -42,7 +42,7 @@ undef $hashd if $conf->{ammsrd}{ip_as_ident};
 
 $|=1;
 
-my (@f, $ident, $ip, $res);
+my (@f, $ident, $ip, $ip_length, $res);
 
 while (<>) {
 
@@ -61,7 +61,8 @@ while (<>) {
         }
     }
 
-    $ip = substr ($f [1], 0, -2);
+    $ip_length = index ($f [1], '/');
+    $ip = substr ($f [1], 0, $ip_length);
 
     $ident = $f [2];
 
