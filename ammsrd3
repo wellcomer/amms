@@ -1,0 +1,111 @@
+#!/usr/bin/perl
+
+# AMMS redirector for Squid 3.4+
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+	    
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+			    
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# http://wiki.squid-cache.org/Features/Redirectors
+# Configure concurrency to 1 for this helper
+
+use lib "/usr/lib/amms";
+use AMMS::Lib qw(conf);
+use AMMS::Client;
+use Getopt::Long;
+
+use strict;
+use feature qw(say);
+
+my $conf = conf ();
+
+my $ammsd_uri = $conf->{ammsrd}{ammsd_uri};
+my $hashd_uri = $conf->{ammsrd}{hashd_uri};
+
+my $ammsc = AMMS::Client->new;
+unless ($ammsc->connect ($ammsd_uri)){
+    undef $ammsc;
+}
+
+my $hashd = AMMS::Client->new;
+unless ($hashd->connect ($hashd_uri)){
+    undef $hashd;
+}
+
+undef $hashd if $conf->{ammsrd}{ip_as_ident};
+
+$|=1;
+
+my (@f, $ident, $ip, $ip_length, $res);
+
+while (<>) {
+
+    chomp;
+
+    my @f = split (/\s/);
+    
+    unless (defined $ammsc){ # try to connect or say "internal error"
+        
+        $ammsc = AMMS::Client->new;
+
+        unless ($ammsc->connect ($ammsd_uri)){
+            say "OK status=307 url=" . $conf->{ammsrd}{t_interr};
+            undef $ammsc;
+            next;
+        }
+    }
+
+    $ip_length = index ($f [1], '/');
+    $ip = substr ($f [1], 0, $ip_length);
+
+    $ident = $f [2];
+
+    if ($conf->{ammsrd}{ip_as_ident}){
+        $ident = $ip;
+    }
+    else {
+        $ident = lc $ident if ($conf->{ident_ignorecase});
+    }
+    
+    if ($hashd){
+
+        $res = $hashd->exe ("check2", {key=>"lock/$ident", val=>$ip});
+
+        exit unless defined $res; # restart process without hashd
+
+        if ($res->{s} !~ /OK/i){
+            say "OK status=307 url=" . $conf->{ammsrd}{t_denybyip};
+            next;
+        }
+    }
+
+    $res = $ammsc->exe ("check_access", {ident=>$ident});
+
+    unless (defined $res){ # connection failed
+        say "OK status=307 url=" . $conf->{ammsrd}{t_interr};
+        undef $ammsc;
+        next;
+    }
+
+    if ($res->{s} =~ /OK/i){
+        say "OK";
+        next;
+    }
+
+    if ($res->{s} eq "ERR disabled by sys"){
+        say "OK status=307 url=" . $conf->{ammsrd}{t_overlim};
+        next;
+    }
+
+    say "OK status=307 url=" . $conf->{ammsrd}{t_deny};
+}
+
