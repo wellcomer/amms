@@ -1,0 +1,91 @@
+#!/usr/bin/perl
+# AMMS LDAP integration client (C) 2016
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+        
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+ 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Args:
+# desc - show a desc_field (displayName by default) for all limits (I)
+# desc sync - sync all limits descriptions with LDAP catalog as a source
+# ldif - show a LDIF for the specified limit_ident
+# dump - dump a LDAP record for the specified limit_ident
+
+use lib "/usr/lib/amms";
+use AMMS::Lib qw(:all);
+use AMMS::Client;
+use Getopt::Long;
+use Net::LDAP;
+
+use strict;
+use feature qw(say);
+
+my $conf = conf();
+my $myconf = $conf->{ammsldapi};
+ 
+$myconf->{desc_field} ||= "displayName";
+
+my $todo = shift @ARGV;
+
+my $ldap = Net::LDAP->new ($myconf->{ldap_server}) or die $@;
+
+$ldap->bind ($myconf->{bind_user}, password => $myconf->{bind_password});
+
+my $ammsc = AMMS::Client->new;
+   $ammsc->connect ($conf->{ammsd_uri}) || die "Can't connect to ammsd URI: " . $conf->{ammsd_uri};
+
+if ($todo eq "desc"){
+
+    my $todo2 = shift @ARGV;
+
+    my $limit = xb $ammsc->exe ("get_limit");
+    my $limit_list = $limit->{'I'};
+
+    for my $limit_ident (keys %$limit_list){
+        my $result = $ldap->search (base => $myconf->{search_base}, filter => "sAMAccountName=$limit_ident");
+        if ($result->code){
+            say "ERR $limit_ident " . $result->error;
+            next;
+        }
+	my ($desc, $entry);
+	$entry = $result->entry(0);
+	$desc = $entry->get_value($myconf->{desc_field}) if $entry;
+	if ($todo2 eq "sync"){
+	    my $res = xs $ammsc->exe ("update_limit", {type=>'I', ident=>$limit_ident, desc=>$desc});
+	    say "$res $limit_ident $desc";
+	}
+	else {
+            say "OK $limit_ident $desc";
+	}
+    }
+}
+elsif ($todo eq "dump" or $todo eq "ldif"){
+
+	my $limit_ident = shift @ARGV;
+	die "No ident in argument list" unless $limit_ident;
+	
+        my $result = $ldap->search (base => $myconf->{search_base}, filter => "sAMAccountName=$limit_ident");
+	die $result->error if $result->code;
+	die "Empty entry" unless ($result->entry(0));
+	
+	if ($todo eq "ldif"){
+		print $result->entry(0)->ldif;
+	}
+	elsif ($todo eq "dump"){
+		$result->entry(0)->dump;
+	}
+}
+else {
+	say "Usage: ammsldapi (desc [sync] | ldif limit_ident | dump limit_ident)";
+}
+
+$ldap->unbind;
